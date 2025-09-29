@@ -266,8 +266,16 @@ class PresidentGame {
         this.currentNewsStories.forEach(story => {
             const item = document.createElement('span');
             item.className = 'news-item';
+            item.setAttribute('role', 'listitem');
+            item.tabIndex = 0;
             item.textContent = `[${story.source}] ${story.headline}`;
             item.onclick = () => this.respondToNews(story);
+            item.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    this.respondToNews(story);
+                }
+            });
             ticker.appendChild(item);
         });
     }
@@ -426,6 +434,7 @@ class PresidentGame {
     }
 
     gameLoop() {
+        this.day += 1;
         this.updateGameContext();
 
         this.chaos += this.currentContext.publicMood === 'angry' ? 2 : 1;
