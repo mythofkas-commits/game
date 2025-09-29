@@ -291,12 +291,17 @@ class PresidentGame {
             <h2 style="color: #fff; margin-bottom: 20px;">${story.headline}</h2>
             <p style="color: #ddd; margin-bottom: 20px;">This requires your immediate attention!</p>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                <button class="decision-btn" onclick="game.quickNewsResponse('dismiss', '${story.headline}')">Dismiss</button>
-                <button class="decision-btn" onclick="game.quickNewsResponse('tweet', '${story.headline}')">Tweet Response</button>
-                <button class="decision-btn" onclick="game.quickNewsResponse('call', '${story.headline}')">Emergency Call</button>
-                <button class="decision-btn" onclick="game.quickNewsResponse('crisis', '${story.headline}')">Crisis Mode</button>
+                <button class="decision-btn" data-action="dismiss">Dismiss</button>
+                <button class="decision-btn" data-action="tweet">Tweet Response</button>
+                <button class="decision-btn" data-action="call">Emergency Call</button>
+                <button class="decision-btn" data-action="crisis">Crisis Mode</button>
             </div>
         `;
+
+        alert.querySelectorAll('.decision-btn[data-action]').forEach(button => {
+            const action = button.dataset.action;
+            button.addEventListener('click', () => this.quickNewsResponse(action, story.headline));
+        });
         document.body.appendChild(alert);
 
         setTimeout(() => {
