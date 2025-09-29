@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRESIDENT SIMULATOR: Total Chaos Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .intro-screen {
+            position: fixed;
+            width: 100%;
+            height: 100vh;
+            background: radial-gradient(circle at center, #000428 0%, #004e92 100%);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .presidential-seal {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #ffd700, #b8860b);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            animation: sealGlow 2s ease-in-out infinite;
+            box-shadow: 0 0 50px rgba(255,215,0,0.5);
+            border: 5px solid #b8860b;
+        }
+
+        @keyframes sealGlow {
+            0%, 100% {
+                box-shadow: 0 0 30px rgba(255,215,0,0.5);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 60px rgba(255,215,0,0.8);
+                transform: scale(1.05);
+            }
+        }
+
+        .game-title {
+            font-size: 48px;
+            color: #ffd700;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+            letter-spacing: 2px;
+        }
+
+        .start-presidency-btn {
+            background: linear-gradient(135deg, #ff0000, #0000ff);
+            color: #fff;
+            border: none;
+            padding: 20px 60px;
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 50px;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .start-presidency-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .game-container {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1a2e 50%, #16213e 100%);
+            padding: 20px;
+        }
+
+        .status-bar {
+            background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(0,0,0,0.8));
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tweet-panel {
+            background: linear-gradient(135deg, #1da1f2, #0d8ddb);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .tweet-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.95);
+            color: #000;
+            margin-bottom: 15px;
+        }
+
+        .tweet-btn {
+            background: #fff;
+            color: #1da1f2;
+            border: none;
+            padding: 12px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .tweet-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255,255,255,0.4);
+        }
+
+        .relationships-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .relationships-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .relationship-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .relationship-card:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-3px);
+        }
+
+        .relationship-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+
+        .meter {
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+
+        .meter-fill {
+            height: 100%;
+            transition: width 0.5s;
+        }
+
+        .trust-fill { background: linear-gradient(90deg, #4CAF50, #8BC34A); }
+        .respect-fill { background: linear-gradient(90deg, #2196F3, #03A9F4); }
+        .fear-fill { background: linear-gradient(90deg, #f44336, #ff9800); }
+
+        .crisis-panel {
+            background: rgba(255,0,0,0.1);
+            border: 2px solid #ff0000;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .decision-btn {
+            background: #ffd700;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .press-conference {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, #000, rgba(0,0,0,0.95));
+            padding: 20px;
+            transition: bottom 0.5s;
+            z-index: 500;
+        }
+
+        .press-conference.active {
+            bottom: 0;
+        }
+
+        .reporters-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        .reporter {
+            background: rgba(255,255,255,0.1);
+            padding: 12px;
+            border-radius: 10px;
+            min-width: 160px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .reporter.selected {
+            border-color: #ffd700;
+            background: rgba(255,215,0,0.2);
+        }
+
+        .reporter.hostile { border-color: #ff0000; }
+        .reporter.friendly { border-color: #00ff00; }
+        .reporter.neutral { border-color: #ffff00; }
+
+        .response-options {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .response-btn {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 2px solid #666;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .response-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #ffd700;
+        }
+
+        .scandal-control,
+        .phone-interface {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(0,0,0,0.85);
+            border-radius: 20px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .scandal-control.active,
+        .phone-interface.active {
+            display: block;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .scandal-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .scandal-node {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,0,0,0.2);
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 0 auto;
+        }
+
+        .scandal-node.infected {
+            background: rgba(255,0,0,0.6);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .damage-control {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 999;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,215,0,0.9);
+            color: #000;
+            padding: 15px 20px;
+            border-radius: 10px;
+            animation: slideIn 0.5s ease-out;
+            z-index: 1000;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .dopamine-burst {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: #ffd700;
+            font-weight: bold;
+            pointer-events: none;
+            animation: dopamineBurst 1s ease-out forwards;
+            text-shadow: 0 0 50px #ffd700;
+            z-index: 5000;
+        }
+
+        @keyframes dopamineBurst {
+            0% {
+                transform: translate(-50%, -50%) scale(0) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.5) rotate(180deg);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="intro-screen" id="introScreen">
+        <div class="presidential-seal">
+            <div style="font-size: 60px;">🟠</div>
+            <div style="font-size: 48px;">👤</div>
+            <div style="font-size: 14px; font-weight: bold; color: #b8860b;">POTUS</div>
+        </div>
+        <h1 class="game-title">PRESIDENT SIMULATOR</h1>
+        <h2 style="color: #ff0000; margin-bottom: 30px;">TOTAL CHAOS EDITION</h2>
+        <button class="start-presidency-btn" onclick="startPresidency()">BEGIN PRESIDENCY</button>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <div class="status-bar">
+            <div>Day: <span id="day">1</span></div>
+            <div>Energy: <span id="energy">100</span></div>
+            <div>Chaos: <span id="chaos">0</span></div>
+            <div>Score: <span id="score">0</span></div>
+        </div>
+
+        <div class="tweet-panel">
+            <h3 style="color: #fff; margin-bottom: 15px;">TWEET STORM SYSTEM</h3>
+            <input type="text" class="tweet-input" id="tweetInput" placeholder="What's on your mind, Mr. President?" maxlength="280">
+            <button class="tweet-btn" onclick="game.sendTweet()">SEND TWEET</button>
+        </div>
+
+        <div class="relationships-panel">
+            <h3 style="color: #ffd700; margin-bottom: 10px;">KEY RELATIONSHIPS</h3>
+            <div class="relationships-grid" id="relationshipsGrid"></div>
+        </div>
+
+        <div class="crisis-panel" id="crisisPanel">
+            <h2 id="crisisTitle">Crisis Loading...</h2>
+            <p id="crisisDescription">Preparing situation...</p>
+            <div id="crisisOptions"></div>
+            <button class="decision-btn" style="background: #1da1f2; color: #fff; margin-top: 15px;" onclick="game.startPressConference()">Hold Press Conference</button>
+        </div>
+    </div>
+
+    <div class="press-conference" id="pressConference">
+        <button class="decision-btn" style="position: absolute; top: 10px; right: 20px; background: #ff0000; color: #fff;" onclick="game.endPressConference()">End Conference</button>
+        <h3 style="color: #ffd700; margin-bottom: 15px;">PRESS CONFERENCE</h3>
+        <div id="currentQuestion" style="color: #fff; margin-bottom: 15px; font-style: italic;"></div>
+        <div class="reporters-row" id="reportersRow"></div>
+        <div class="response-options">
+            <button class="response-btn" onclick="game.pressResponse('attack')">ATTACK</button>
+            <button class="response-btn" onclick="game.pressResponse('deflect')">DEFLECT</button>
+            <button class="response-btn" onclick="game.pressResponse('answer')">ANSWER</button>
+            <button class="response-btn" onclick="game.pressResponse('joke')">JOKE</button>
+        </div>
+    </div>
+
+    <div class="scandal-control" id="scandalControl">
+        <button class="decision-btn" style="position: absolute; top: 10px; right: 20px; background: #ff0000; color: #fff;" onclick="game.closeScandal()">X</button>
+        <h2 style="color: #ff0000; margin-bottom: 10px;">SCANDAL SPREADING!</h2>
+        <p style="color: #fff; margin-bottom: 10px;">Click infected nodes to contain the scandal!</p>
+        <div class="scandal-grid" id="scandalGrid"></div>
+        <div class="damage-control" id="damageControl"></div>
+    </div>
+
+    <div class="phone-interface" id="phoneInterface">
+        <div class="caller-name" id="callerName" style="font-size: 24px; color: #ffd700; text-align: center; margin-bottom: 20px;">Unknown Caller</div>
+        <div class="negotiation-info" id="negotiationInfo" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;"></div>
+        <div class="leverage-cards" id="leverageCards" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;"></div>
+        <button class="decision-btn" style="width: 100%;" onclick="game.endCall()">End Call</button>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+        class PresidentGame {
+            constructor() {
+                this.day = 1;
+                this.energy = 100;
+                this.chaos = 0;
+                this.score = 0;
+
+                this.history = {
+                    tweets: [],
+                    decisions: [],
+                    phoneCalls: [],
+                    scandals: []
+                };
+
+                this.currentContext = {
+                    publicMood: 'neutral',
+                    economicState: 'stable',
+                    internationalTension: 'low'
+                };
+
+                this.relationships = [
+                    { name: 'Chuck Schumer', trust: 30, respect: 40, fear: 20, role: 'Senate Leader', personality: 'strategic', lastInteraction: 0, currentIssues: ['budget', 'healthcare'] },
+                    { name: 'Mitch McConnell', trust: 60, respect: 50, fear: 10, role: 'Senate GOP', personality: 'calculating', lastInteraction: 0, currentIssues: ['taxes', 'judges'] },
+                    { name: 'Nancy Pelosi', trust: 20, respect: 30, fear: 30, role: 'House Speaker', personality: 'aggressive', lastInteraction: 0, currentIssues: ['impeachment', 'oversight'] },
+                    { name: 'Vladimir Putin', trust: 50, respect: 60, fear: 40, role: 'Russian President', personality: 'ruthless', lastInteraction: 0, currentIssues: ['sanctions', 'ukraine', 'syria'] },
+                    { name: 'Xi Jinping', trust: 40, respect: 55, fear: 35, role: 'Chinese President', personality: 'patient', lastInteraction: 0, currentIssues: ['trade', 'taiwan', 'technology'] },
+                    { name: 'Boris Johnson', trust: 70, respect: 45, fear: 5, role: 'UK PM', personality: 'chaotic', lastInteraction: 0, currentIssues: ['brexit', 'trade', 'nato'] }
+                ];
+
+                this.reporters = [
+                    { name: 'Jim Acosta', outlet: 'CNN', mood: 'hostile', trust: 20, specialty: 'scandal' },
+                    { name: 'Peter Doocy', outlet: 'Fox News', mood: 'friendly', trust: 80, specialty: 'economy' },
+                    { name: 'Yamiche Alcindor', outlet: 'PBS', mood: 'neutral', trust: 50, specialty: 'policy' },
+                    { name: 'April Ryan', outlet: 'The Grio', mood: 'hostile', trust: 30, specialty: 'social' }
+                ];
+
+                this.crisisTemplates = {
+                    domestic: ['budget', 'scandal', 'protest'],
+                    international: ['trade war', 'military conflict', 'diplomatic incident'],
+                    economic: ['market crash', 'inflation', 'bank failure'],
+                    political: ['impeachment', 'election', 'congress revolt']
+                };
+
+                this.currentCrisis = null;
+                this.currentReporter = null;
+                this.currentCaller = null;
+                this.scandalInterval = null;
+            }
+
+            init() {
+                this.updateDisplay();
+                this.displayRelationships();
+                this.generateContextualCrisis();
+                this.setupReporters();
+
+                this.gameInterval = setInterval(() => this.gameLoop(), 5000);
+            }
+
+            gameLoop() {
+                this.day += 1;
+                this.energy = clamp(this.energy - 2, 0, 100);
+                this.chaos = clamp(this.chaos + (this.currentContext.publicMood === 'angry' ? 2 : 1), 0, 100);
+                this.score += 10;
+
+                this.updateGameContext();
+                if (Math.random() < 0.2) this.triggerContextualEvent();
+                if (Math.random() < 0.15) this.evolveRelationships();
+
+                this.updateDisplay();
+            }
+
+            updateGameContext() {
+                const recentChaos = this.history.decisions.slice(-3).reduce((sum, d) => sum + (d.chaosChange || 0), 0);
+                this.currentContext.publicMood = recentChaos > 30 ? 'angry' : recentChaos < -10 ? 'happy' : 'neutral';
+
+                this.currentContext.economicState = this.chaos > 70 ? 'crisis' : this.chaos > 40 ? 'unstable' : 'stable';
+
+                const foreignRelationships = this.relationships.filter(r => ['Vladimir Putin', 'Xi Jinping', 'Boris Johnson'].includes(r.name));
+                const avgTrust = foreignRelationships.reduce((sum, r) => sum + r.trust, 0) / foreignRelationships.length;
+                this.currentContext.internationalTension = avgTrust < 30 ? 'high' : avgTrust < 50 ? 'medium' : 'low';
+            }
+
+            generateContextualCrisis() {
+                const recentTypes = this.history.decisions.slice(-5).map(d => d.crisisType);
+                let category = 'political';
+                if (this.currentContext.internationalTension === 'high') category = 'international';
+                else if (this.currentContext.economicState === 'crisis') category = 'economic';
+                else if (this.currentContext.publicMood === 'angry') category = 'domestic';
+                else category = ['domestic', 'international', 'economic', 'political'][Math.floor(Math.random() * 4)];
+
+                const pool = this.crisisTemplates[category].filter(type => !recentTypes.includes(type));
+                const type = (pool.length ? pool : this.crisisTemplates[category])[Math.floor(Math.random() * this.crisisTemplates[category].length)];
+
+                this.currentCrisis = this.createCrisis(type, category);
+                this.displayCrisis();
+            }
+
+            createCrisis(type, category) {
+                const titleMap = {
+                    budget: 'GOVERNMENT SHUTDOWN IMMINENT',
+                    scandal: 'BREAKING SCANDAL',
+                    protest: 'MASSIVE PROTESTS ERUPTING',
+                    'trade war': 'TRADE WAR ESCALATING',
+                    'military conflict': 'MILITARY CRISIS',
+                    'diplomatic incident': 'DIPLOMATIC FIRESTORM',
+                    'market crash': 'MARKETS IN FREEFALL',
+                    impeachment: 'IMPEACHMENT THREAT'
+                };
+
+                const descriptionMap = {
+                    budget: `Congress deadlocked over spending. ${this.currentContext.economicState === 'crisis' ? 'Economic chaos worsens the standoff.' : 'Time is running out.'}`,
+                    scandal: `${this.history.scandals.length ? 'Another scandal rocks your administration.' : 'Explosive allegations surface.'}`,
+                    protest: `Massive protests erupt nationwide. ${this.currentContext.publicMood === 'angry' ? 'Public fury is boiling over!' : 'Tensions are climbing.'}`,
+                    'trade war': `${this.currentContext.internationalTension === 'high' ? 'Allies are nervous.' : 'Markets brace for retaliation.'}`,
+                    'military conflict': 'Foreign troops mobilizing along the border.',
+                    'diplomatic incident': 'Ambassadors demand immediate answers.',
+                    'market crash': `${this.currentContext.economicState === 'crisis' ? 'Global panic sets in.' : 'Investors are rattled.'}`,
+                    impeachment: 'Congress opens inquiries into presidential conduct.'
+                };
+
+                return {
+                    type,
+                    category,
+                    title: titleMap[type] || 'CRISIS ERUPTING',
+                    description: descriptionMap[type] || 'A volatile situation requires your attention.',
+                    options: this.buildCrisisOptions(type)
+                };
+            }
+
+            buildCrisisOptions(type) {
+                const options = [];
+                const aggressiveText = {
+                    budget: 'Threaten to shut down government',
+                    scandal: 'Attack accusers on live TV',
+                    protest: 'Deploy federal forces',
+                    'trade war': 'Impose massive tariffs',
+                    'military conflict': 'Launch airstrikes',
+                    'diplomatic incident': 'Expel diplomats immediately',
+                    'market crash': 'Blame the central bank',
+                    impeachment: 'Threaten Congress with retaliation'
+                };
+
+                const diplomaticText = {
+                    budget: 'Broker a bipartisan compromise',
+                    scandal: 'Address the nation calmly',
+                    protest: 'Meet with protest leaders',
+                    'trade war': 'Seek emergency diplomacy',
+                    'military conflict': 'Call for a ceasefire',
+                    'diplomatic incident': 'Apologize and de-escalate',
+                    'market crash': 'Reassure markets with guarantees',
+                    impeachment: 'Cooperate with investigators'
+                };
+
+                const strategicText = {
+                    budget: 'Use executive workaround',
+                    scandal: 'Launch strategic distraction',
+                    protest: 'Announce reform package',
+                    'trade war': 'Coordinate with allies',
+                    'military conflict': 'Authorize covert operations',
+                    'diplomatic incident': 'Offer secret concessions',
+                    'market crash': 'Introduce emergency stimulus',
+                    impeachment: 'Deploy legal counter-strategy'
+                };
+
+                options.push({ text: aggressiveText[type] || 'Go on the offensive', effect: 'aggressive', impacts: this.determineImpacts(type, 'aggressive') });
+                if (this.getAverageRelationshipHealth() > 35) {
+                    options.push({ text: diplomaticText[type] || 'Seek diplomacy', effect: 'diplomatic', impacts: this.determineImpacts(type, 'diplomatic') });
+                }
+                if (this.energy > 30) {
+                    options.push({ text: strategicText[type] || 'Plan a clever move', effect: 'strategic', impacts: [] });
+                }
+                if (this.chaos > 55 || this.currentContext.publicMood === 'angry') {
+                    options.push({ text: 'Double down on chaos', effect: 'chaotic', impacts: [] });
+                }
+                return options;
+            }
+
+            determineImpacts(type, approach) {
+                if (type === 'budget' && approach === 'aggressive') return ['Chuck Schumer', 'Nancy Pelosi'];
+                if (type === 'trade war') return ['Xi Jinping'];
+                if (type === 'military conflict') return ['Vladimir Putin'];
+                return [];
+            }
+
+            displayCrisis() {
+                if (!this.currentCrisis) return;
+                document.getElementById('crisisTitle').textContent = this.currentCrisis.title;
+                document.getElementById('crisisDescription').textContent = this.currentCrisis.description;
+
+                const optionsDiv = document.getElementById('crisisOptions');
+                optionsDiv.innerHTML = '';
+                this.currentCrisis.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'decision-btn';
+                    button.textContent = option.text;
+                    button.onclick = () => this.handleDecision(option);
+                    optionsDiv.appendChild(button);
+                });
+            }
+
+            handleDecision(option) {
+                const chaosChanges = { aggressive: 15, diplomatic: -5, strategic: 5, chaotic: 25 };
+                const energyCosts = { aggressive: 10, diplomatic: 5, strategic: 15, chaotic: 20 };
+                const scoreBonus = { aggressive: 50, diplomatic: 30, strategic: 70, chaotic: 100 };
+
+                this.history.decisions.push({
+                    crisisType: this.currentCrisis.type,
+                    action: option.text,
+                    timestamp: Date.now(),
+                    chaosChange: chaosChanges[option.effect] || 0
+                });
+
+                this.chaos = clamp(this.chaos + (chaosChanges[option.effect] || 0), 0, 100);
+                this.energy = clamp(this.energy - (energyCosts[option.effect] || 0), 0, 100);
+                this.score += scoreBonus[option.effect] || 0;
+
+                option.impacts.forEach(name => {
+                    if (option.effect === 'aggressive') this.updateRelationship(name, -15, -10, 20);
+                    if (option.effect === 'diplomatic') this.updateRelationship(name, 10, 15, -5);
+                });
+
+                this.showNotification(`You chose: ${option.text}`);
+                this.updateDisplay();
+                setTimeout(() => this.generateContextualCrisis(), 3000);
+            }
+
+            displayRelationships() {
+                const grid = document.getElementById('relationshipsGrid');
+                grid.innerHTML = '';
+                this.relationships.forEach(rel => {
+                    const card = document.createElement('div');
+                    card.className = 'relationship-card';
+                    card.innerHTML = `
+                        <div class="relationship-name">${rel.name}</div>
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">${rel.role}</div>
+                        <div class="meter"><div class="meter-fill trust-fill" style="width: ${rel.trust}%"></div></div>
+                        <div style="font-size: 10px; color: #aaa;">Trust: ${rel.trust}%</div>
+                        <div class="meter"><div class="meter-fill respect-fill" style="width: ${rel.respect}%"></div></div>
+                        <div style="font-size: 10px; color: #aaa;">Respect: ${rel.respect}%</div>
+                        <div class="meter"><div class="meter-fill fear-fill" style="width: ${rel.fear}%"></div></div>
+                        <div style="font-size: 10px; color: #aaa;">Fear: ${rel.fear}%</div>
+                    `;
+                    card.onclick = () => this.negotiateWith(rel);
+                    grid.appendChild(card);
+                });
+            }
+
+            getAverageRelationshipHealth() {
+                const total = this.relationships.reduce((sum, rel) => sum + rel.trust + rel.respect, 0);
+                return total / (this.relationships.length * 2);
+            }
+
+            updateRelationship(name, trustDelta = 0, respectDelta = 0, fearDelta = 0) {
+                const rel = this.relationships.find(r => r.name === name);
+                if (!rel) return;
+                rel.trust = clamp(rel.trust + trustDelta, 0, 100);
+                rel.respect = clamp(rel.respect + respectDelta, 0, 100);
+                rel.fear = clamp(rel.fear + fearDelta, 0, 100);
+                rel.lastInteraction = Date.now();
+                this.displayRelationships();
+
+                const deltas = [];
+                if (trustDelta) deltas.push(`Trust ${trustDelta > 0 ? '+' : ''}${trustDelta}`);
+                if (respectDelta) deltas.push(`Respect ${respectDelta > 0 ? '+' : ''}${respectDelta}`);
+                if (fearDelta) deltas.push(`Fear ${fearDelta > 0 ? '+' : ''}${fearDelta}`);
+                if (deltas.length) this.showNotification(`${name}: ${deltas.join(', ')}`);
+            }
+
+            negotiateWith(rel) {
+                if (Math.random() < 0.5 && !document.getElementById('phoneInterface').classList.contains('active')) {
+                    this.initiatePhoneCall(rel);
+                    return;
+                }
+
+                const success = Math.random() < rel.trust / 100;
+                if (success) {
+                    this.score += 40;
+                    this.chaos = clamp(this.chaos - 10, 0, 100);
+                    this.updateRelationship(rel.name, 10, 5, 0);
+                    this.showNotification(`Successful negotiation with ${rel.name}`);
+                } else {
+                    this.chaos = clamp(this.chaos + 5, 0, 100);
+                    this.updateRelationship(rel.name, -10, -5, 10);
+                    this.showNotification(`${rel.name} rejects your proposal.`);
+                }
+                this.energy = clamp(this.energy - 8, 0, 100);
+                this.updateDisplay();
+            }
+
+            setupReporters() {
+                const row = document.getElementById('reportersRow');
+                row.innerHTML = '';
+                this.reporters.forEach(reporter => {
+                    const el = document.createElement('div');
+                    el.className = `reporter ${reporter.mood}`;
+                    el.innerHTML = `
+                        <div style="font-weight: bold; margin-bottom: 5px;">${reporter.name}</div>
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 8px;">${reporter.outlet}</div>
+                        <div class="meter"><div class="meter-fill" style="width: ${reporter.trust}%; background: ${reporter.mood === 'hostile' ? '#ff0000' : reporter.mood === 'friendly' ? '#00ff00' : '#ffff00'}"></div></div>
+                    `;
+                    el.onclick = () => this.selectReporter(reporter, el);
+                    row.appendChild(el);
+                });
+            }
+
+            startPressConference() {
+                document.getElementById('pressConference').classList.add('active');
+                this.showNotification('Press conference underway.');
+                this.setupReporters();
+            }
+
+            endPressConference() {
+                document.getElementById('pressConference').classList.remove('active');
+                this.currentReporter = null;
+                document.getElementById('currentQuestion').textContent = '';
+            }
+
+            selectReporter(reporter, element) {
+                document.querySelectorAll('.reporter').forEach(r => r.classList.remove('selected'));
+                element.classList.add('selected');
+                this.currentReporter = reporter;
+                const question = this.generateQuestion(reporter);
+                document.getElementById('currentQuestion').textContent = `${reporter.name} asks: "${question}"`;
+            }
+
+            generateQuestion(reporter) {
+                const crisis = this.history.decisions[this.history.decisions.length - 1];
+                const scandal = this.history.scandals[this.history.scandals.length - 1];
+                const recentTweet = this.history.tweets[this.history.tweets.length - 1];
+
+                const baseQuestions = {
+                    hostile: ['Why are you failing the American people?', 'Do you take responsibility for this chaos?', 'Will you resign if impeached?'],
+                    friendly: ['What is your proudest achievement?', 'How will you lead the nation forward?', 'Any message to your supporters?'],
+                    neutral: ['How will you resolve the crisis?', 'What is your plan for tomorrow?', 'Can you clarify your previous statement?']
+                };
+
+                const pool = [...baseQuestions[reporter.mood] || baseQuestions.neutral];
+                if (reporter.specialty === 'economy' && this.currentContext.economicState !== 'stable') pool.push('What is your plan to calm the markets?');
+                if (reporter.specialty === 'scandal' && scandal) pool.push(`Can you address the ${scandal.type} scandal?`);
+                if (recentTweet && recentTweet.chaos > 20) pool.push('Do you regret your latest tweet?');
+                if (crisis) pool.push(`Why did you choose to ${crisis.action.toLowerCase()}?`);
+
+                return pool[Math.floor(Math.random() * pool.length)];
+            }
+
+            pressResponse(style) {
+                if (!this.currentReporter) {
+                    this.showNotification('Select a reporter first.');
+                    return;
+                }
+
+                const effects = {
+                    attack: { chaos: 15, score: 30, trustDelta: -20, message: 'You attack the media!' },
+                    deflect: { chaos: 5, score: 20, trustDelta: -10, message: 'You deflect the question.' },
+                    answer: { chaos: -5, score: 15, trustDelta: 10, message: 'You deliver a serious answer.' },
+                    joke: { chaos: 10, score: 40, trustDelta: Math.random() < 0.5 ? 15 : -10, message: 'You crack a risky joke.' }
+                };
+
+                const effect = effects[style];
+                this.chaos = clamp(this.chaos + effect.chaos, 0, 100);
+                this.score += effect.score;
+                this.energy = clamp(this.energy - 5, 0, 100);
+                this.currentReporter.trust = clamp(this.currentReporter.trust + effect.trustDelta, 0, 100);
+
+                this.showNotification(effect.message);
+                this.updateDisplay();
+                this.setupReporters();
+                document.getElementById('currentQuestion').textContent = '';
+                this.currentReporter = null;
+            }
+
+            sendTweet() {
+                const input = document.getElementById('tweetInput');
+                const content = input.value.trim();
+                if (!content) {
+                    this.showNotification('No content!');
+                    return;
+                }
+
+                const hotWords = ['fake', 'disaster', 'tremendous', 'witch hunt', 'enemy'];
+                let chaosImpact = 5;
+                hotWords.forEach(word => {
+                    if (content.toLowerCase().includes(word)) chaosImpact += 10;
+                });
+
+                this.relationships.forEach(rel => {
+                    const surname = rel.name.split(' ').pop().toLowerCase();
+                    if (content.toLowerCase().includes(surname)) {
+                        if (/(great|friend|ally)/i.test(content)) this.updateRelationship(rel.name, 15, 10, 0);
+                        if (/(bad|terrible|weak)/i.test(content)) {
+                            this.updateRelationship(rel.name, -20, -15, 15);
+                            chaosImpact += 15;
+                        }
+                    }
+                });
+
+                this.chaos = clamp(this.chaos + chaosImpact, 0, 100);
+                this.score += chaosImpact * 8;
+                this.history.tweets.push({ content, chaos: chaosImpact, timestamp: Date.now() });
+                input.value = '';
+
+                this.triggerDopamineHit(chaosImpact > 20 ? 'VIRAL!' : 'SENT!');
+                this.showNotification(`Tweet sent! Chaos +${chaosImpact}`);
+                this.updateDisplay();
+            }
+
+            triggerContextualEvent() {
+                const events = [];
+                if (this.currentContext.economicState === 'crisis') events.push('market_panic');
+                if (this.currentContext.internationalTension === 'high') events.push('diplomatic_incident');
+                if (this.currentContext.publicMood === 'angry') events.push('protest');
+                this.relationships.forEach(rel => {
+                    if (rel.trust < 20) events.push({ type: 'betrayal', actor: rel.name });
+                    if (rel.fear > 70) events.push({ type: 'submission', actor: rel.name });
+                });
+                if (!events.length) events.push('routine_news');
+
+                const event = events[Math.floor(Math.random() * events.length)];
+                this.executeEvent(event);
+            }
+
+            executeEvent(event) {
+                if (typeof event === 'object') {
+                    if (event.type === 'betrayal') {
+                        this.showNotification(`${event.actor} publicly breaks with you!`);
+                        this.updateRelationship(event.actor, -25, -15, 5);
+                        this.chaos = clamp(this.chaos + 20, 0, 100);
+                        if (Math.random() < 0.5) setTimeout(() => this.triggerScandal(), 1500);
+                    } else if (event.type === 'submission') {
+                        this.showNotification(`${event.actor} reluctantly supports your agenda.`);
+                        this.updateRelationship(event.actor, 5, -5, 10);
+                        this.score += 80;
+                    }
+                    return;
+                }
+
+                const notifications = {
+                    market_panic: () => {
+                        this.showNotification('MARKETS IN TURMOIL!');
+                        this.chaos = clamp(this.chaos + 20, 0, 100);
+                        this.currentContext.economicState = 'crisis';
+                    },
+                    diplomatic_incident: () => {
+                        this.showNotification('Foreign diplomats outraged!');
+                        this.chaos = clamp(this.chaos + 12, 0, 100);
+                        this.currentContext.internationalTension = 'high';
+                        const leader = this.relationships.find(r => ['Vladimir Putin', 'Xi Jinping'].includes(r.name));
+                        if (leader) setTimeout(() => this.initiatePhoneCall(leader), 2500);
+                    },
+                    protest: () => {
+                        this.showNotification('Protesters surround the White House!');
+                        this.chaos = clamp(this.chaos + 10, 0, 100);
+                        this.currentContext.publicMood = 'angry';
+                    },
+                    routine_news: () => {
+                        this.showNotification('A quiet news cycle... for now.');
+                    }
+                };
+
+                (notifications[event] || notifications.routine_news)();
+                this.updateDisplay();
+            }
+
+            evolveRelationships() {
+                this.relationships.forEach(rel => {
+                    if (rel.personality === 'strategic' && Date.now() - rel.lastInteraction > 60000) rel.trust = clamp(rel.trust - 3, 0, 100);
+                    if (rel.personality === 'aggressive') {
+                        rel.fear = clamp(rel.fear + 1, 0, 100);
+                        rel.respect = clamp(rel.respect - 1, 0, 100);
+                    }
+                    if (rel.personality === 'patient') rel.trust = clamp(rel.trust + 1, 0, 100);
+                });
+                this.displayRelationships();
+            }
+
+            initiatePhoneCall(caller) {
+                if (caller.lastInteraction && Date.now() - caller.lastInteraction < 30000) {
+                    this.showNotification(`${caller.name} is unavailable right now.`);
+                    return;
+                }
+
+                caller.lastInteraction = Date.now();
+                this.currentCaller = caller;
+
+                const demand = this.generateDemand(caller);
+                caller.currentDemand = demand;
+                this.history.phoneCalls.push({ caller: caller.name, demand, timestamp: Date.now() });
+
+                document.getElementById('phoneInterface').classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+                document.getElementById('callerName').textContent = caller.name;
+                document.getElementById('negotiationInfo').innerHTML = `
+                    <div style="color: #fff;">
+                        <div>Trust: ${caller.trust}%</div>
+                        <div>Respect: ${caller.respect}%</div>
+                        <div>Fear: ${caller.fear}%</div>
+                        <div style="margin-top: 10px; color: #ffd700;">Current demand:</div>
+                        <div>${demand.text}</div>
+                        <div style="margin-top: 10px; color: #aaa; font-size: 12px;">Context: ${demand.context}</div>
+                    </div>
+                `;
+                this.renderLeverageOptions(caller, demand);
+            }
+
+            generateDemand(caller) {
+                const recent = this.history.phoneCalls.filter(call => call.caller === caller.name).slice(-3).map(call => call.demand.issue);
+                const issues = caller.currentIssues.filter(issue => !recent.includes(issue));
+                const issue = (issues.length ? issues : caller.currentIssues)[Math.floor(Math.random() * caller.currentIssues.length)];
+
+                const aggressive = {
+                    sanctions: 'Lift the sanctions immediately or face retaliation.',
+                    trade: 'Accept our trade terms within 24 hours.',
+                    budget: 'Fund our priorities or the government shuts down.',
+                    healthcare: 'Kill the bill or we block everything.'
+                };
+                const friendly = {
+                    sanctions: 'Can we ease some sanctions together?',
+                    trade: 'Let us collaborate on a fair trade deal.',
+                    budget: 'Let’s find budget common ground.',
+                    healthcare: 'Could we partner on healthcare reform?'
+                };
+                const neutral = {
+                    sanctions: 'We must address the sanctions issue.',
+                    trade: 'Trade negotiations must move forward.',
+                    budget: 'The budget stalemate needs a solution.',
+                    healthcare: 'Healthcare policy can’t be ignored.'
+                };
+
+                let tone = neutral[issue] || `We need to talk about ${issue}.`;
+                let context = 'Standard diplomatic approach.';
+                if (caller.personality === 'aggressive' && caller.fear < 50) {
+                    tone = aggressive[issue] || `Take decisive action on ${issue}.`;
+                    context = 'Caller sounds confrontational.';
+                } else if (caller.trust > 60) {
+                    tone = friendly[issue] || `Let’s cooperate on ${issue}.`;
+                    context = 'Caller is willing to cooperate.';
+                }
+
+                return { text: tone, issue, context };
+            }
+
+            renderLeverageOptions(caller, demand) {
+                const container = document.getElementById('leverageCards');
+                container.innerHTML = '';
+
+                const options = [
+                    { name: 'Agree to demand', chance: 90, risk: 'Low', effect: 'cooperative' },
+                    { name: 'Refuse outright', chance: 25, risk: 'High', effect: 'aggressive' }
+                ];
+                if (caller.fear > 30) options.push({ name: 'Threaten retaliation', chance: 40 + caller.fear / 2, risk: 'Very High', effect: 'intimidate' });
+                if (caller.trust > 40) options.push({ name: 'Offer compromise', chance: 30 + caller.trust / 2, risk: 'Medium', effect: 'diplomatic' });
+                if (caller.respect > 50) options.push({ name: 'Appeal to shared goals', chance: 40 + caller.respect / 3, risk: 'Low', effect: 'strategic' });
+                if (this.currentContext.economicState === 'crisis' && demand.issue === 'trade') options.push({ name: 'Emergency trade deal', chance: 70, risk: 'Medium', effect: 'desperate' });
+
+                options.forEach(option => {
+                    const card = document.createElement('div');
+                    card.className = 'leverage-card';
+                    card.innerHTML = `
+                        <div style="font-weight: bold;">${option.name}</div>
+                        <div style="font-size: 12px; margin-top: 5px;">Success: ${Math.round(option.chance)}% | Risk: ${option.risk}</div>
+                    `;
+                    card.onclick = () => this.resolveCall(option, caller, card);
+                    container.appendChild(card);
+                });
+            }
+
+            resolveCall(option, caller, element) {
+                if (element.classList.contains('used')) return;
+                element.classList.add('used');
+                const success = Math.random() * 100 < option.chance;
+
+                if (option.effect === 'cooperative') {
+                    this.updateRelationship(caller.name, 15, 10, -10);
+                    this.chaos = clamp(this.chaos - 10, 0, 100);
+                    this.showNotification(`Agreement reached with ${caller.name}`);
+                } else if (option.effect === 'aggressive' && success) {
+                    this.updateRelationship(caller.name, -20, -10, 20);
+                    this.chaos = clamp(this.chaos + 15, 0, 100);
+                    this.showNotification(`${caller.name} begrudgingly backs down.`);
+                } else if (option.effect === 'diplomatic' && success) {
+                    this.updateRelationship(caller.name, 10, 15, 0);
+                    this.showNotification(`Compromise reached with ${caller.name}`);
+                } else if (!success) {
+                    this.updateRelationship(caller.name, -15, -15, 10);
+                    this.chaos = clamp(this.chaos + 20, 0, 100);
+                    this.showNotification(`${caller.name} storms off the call!`);
+                }
+
+                caller.history = caller.history || [];
+                caller.history.push({ demand: caller.currentDemand, response: option.name, success, timestamp: Date.now() });
+                this.energy = clamp(this.energy - 12, 0, 100);
+                this.updateDisplay();
+                setTimeout(() => this.endCall(), 2000);
+            }
+
+            triggerScandal() {
+                if (document.getElementById('scandalControl').classList.contains('active')) return;
+                const type = this.generateScandalType();
+                this.history.scandals.push({ type, timestamp: Date.now(), contained: false });
+
+                document.getElementById('scandalControl').classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+                document.querySelector('#scandalControl h2').textContent = `${type.toUpperCase()} SCANDAL SPREADING!`;
+
+                const grid = document.getElementById('scandalGrid');
+                grid.innerHTML = '';
+                for (let i = 0; i < 9; i += 1) {
+                    const node = document.createElement('div');
+                    node.className = 'scandal-node';
+                    node.dataset.infected = 'false';
+                    node.onclick = () => this.containNode(node);
+                    grid.appendChild(node);
+                }
+
+                this.renderDamageControl(type);
+                this.startScandalSpread();
+            }
+
+            generateScandalType() {
+                const candidates = ['personal', 'corruption', 'coverup'];
+                if (this.history.tweets.some(tweet => tweet.chaos > 30)) candidates.push('twitter');
+                if (this.relationships.some(rel => rel.trust < 20)) candidates.push('betrayal');
+                if (this.currentContext.economicState === 'crisis') candidates.push('financial');
+                return candidates[Math.floor(Math.random() * candidates.length)];
+            }
+
+            renderDamageControl(type) {
+                const control = document.getElementById('damageControl');
+                control.innerHTML = '';
+                const strategies = [
+                    { name: 'Deny Everything', effectiveness: type === 'twitter' ? 0.3 : 0.5, approach: 'aggressive' },
+                    { name: 'Create Bigger Story', effectiveness: 0.4 + Math.random() * 0.3, approach: 'distraction' }
+                ];
+                if (type === 'twitter') strategies.push({ name: 'Claim account hacked', effectiveness: 0.45, approach: 'deflect' });
+                if (type === 'financial') strategies.push({ name: 'Release tax records', effectiveness: 0.7, approach: 'transparent' });
+                if (this.relationships.some(rel => rel.trust > 70)) strategies.push({ name: 'Call in allies', effectiveness: 0.6, approach: 'coalition' });
+
+                strategies.forEach(strategy => {
+                    const btn = document.createElement('button');
+                    btn.className = 'decision-btn';
+                    btn.style.width = '100%';
+                    btn.textContent = strategy.name;
+                    btn.onclick = () => this.resolveDamageControl(strategy);
+                    control.appendChild(btn);
+                });
+            }
+
+            startScandalSpread() {
+                const nodes = Array.from(document.querySelectorAll('.scandal-node'));
+                const seed = nodes[Math.floor(Math.random() * nodes.length)];
+                seed.classList.add('infected');
+                seed.dataset.infected = 'true';
+
+                this.scandalInterval = setInterval(() => {
+                    const uninfected = nodes.filter(node => node.dataset.infected === 'false');
+                    if (!uninfected.length) {
+                        this.scandalFullySpread();
+                        return;
+                    }
+
+                    const next = uninfected[Math.floor(Math.random() * uninfected.length)];
+                    next.classList.add('infected');
+                    next.dataset.infected = 'true';
+                    this.chaos = clamp(this.chaos + 3, 0, 100);
+                    this.updateDisplay();
+                }, 1800);
+            }
+
+            containNode(node) {
+                if (node.dataset.infected === 'true') {
+                    node.classList.remove('infected');
+                    node.dataset.infected = 'false';
+                    this.chaos = clamp(this.chaos - 5, 0, 100);
+                    this.energy = clamp(this.energy - 4, 0, 100);
+                    this.updateDisplay();
+                    this.showNotification('Scandal contained in this area.');
+                }
+            }
+
+            resolveDamageControl(strategy) {
+                clearInterval(this.scandalInterval);
+                const success = Math.random() < strategy.effectiveness;
+                if (success) {
+                    this.chaos = clamp(this.chaos - 20, 0, 100);
+                    this.score += 120;
+                    this.showNotification('Damage control successful!');
+                    this.history.scandals[this.history.scandals.length - 1].contained = true;
+                } else {
+                    this.chaos = clamp(this.chaos + 15, 0, 100);
+                    this.showNotification('Damage control failed. Scandal grows.');
+                    if (strategy.approach === 'aggressive') {
+                        this.reporters.forEach(reporter => {
+                            reporter.trust = clamp(reporter.trust - 15, 0, 100);
+                            if (reporter.mood === 'neutral') reporter.mood = 'hostile';
+                        });
+                    }
+                }
+                this.closeScandal();
+            }
+
+            scandalFullySpread() {
+                clearInterval(this.scandalInterval);
+                this.chaos = clamp(this.chaos + 30, 0, 100);
+                this.showNotification('SCANDAL WENT VIRAL!');
+                this.triggerDopamineHit('DISASTER!');
+                this.relationships.forEach(rel => {
+                    rel.trust = clamp(rel.trust - 15, 0, 100);
+                    rel.respect = clamp(rel.respect - 10, 0, 100);
+                });
+                this.displayRelationships();
+                this.closeScandal();
+            }
+
+            closeScandal() {
+                document.getElementById('scandalControl').classList.remove('active');
+                document.getElementById('overlay').classList.remove('active');
+                clearInterval(this.scandalInterval);
+            }
+
+            endCall() {
+                document.getElementById('phoneInterface').classList.remove('active');
+                document.getElementById('overlay').classList.remove('active');
+                this.currentCaller = null;
+            }
+
+            updateDisplay() {
+                document.getElementById('day').textContent = this.day;
+                document.getElementById('energy').textContent = this.energy;
+                document.getElementById('chaos').textContent = this.chaos;
+                document.getElementById('score').textContent = this.score;
+            }
+
+            showNotification(message) {
+                const existing = document.querySelector('.notification');
+                if (existing) existing.remove();
+                const notif = document.createElement('div');
+                notif.className = 'notification';
+                notif.textContent = message;
+                document.body.appendChild(notif);
+                setTimeout(() => notif.remove(), 3000);
+            }
+
+            triggerDopamineHit(text) {
+                const burst = document.createElement('div');
+                burst.className = 'dopamine-burst';
+                burst.textContent = text;
+                document.body.appendChild(burst);
+                setTimeout(() => burst.remove(), 1000);
+            }
+        }
+
+        let game;
+        function startPresidency() {
+            document.getElementById('introScreen').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+            game = new PresidentGame();
+            game.init();
+        }
+
+        console.log('Game script loaded successfully');
+    </script>
+</body>
+</html>
