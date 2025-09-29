@@ -1,6 +1,6 @@
 /*
 =============================================================================
-PRESIDENT SIMULATOR - REAL POLITICS EDITION
+PRESIDENT SIMULATOR - TOTAL CHAOS EDITION
 =============================================================================
 */
 
@@ -1557,7 +1557,7 @@ class PresidentGame {
     }
 }
 
-console.log('President Simulator - Real Politics Edition loaded successfully');
+console.log('President Simulator - Total Chaos Edition loaded successfully');
 
 
 window.startPresidency = startPresidency;
