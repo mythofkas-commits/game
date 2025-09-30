@@ -1290,10 +1290,12 @@ class PresidentGame {
             });
         }
 
+        // Effectiveness is higher when chaos is high, lower when chaos is low
+        const distractionEffectiveness = 0.2 + Math.min(0.8, this.chaos / 100);
         strategies.push({
             name: 'Create bigger story',
             approach: 'distraction',
-            effectiveness: Math.random() * 0.8 + 0.2
+            effectiveness: distractionEffectiveness
         });
 
         return strategies;
