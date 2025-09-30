@@ -205,42 +205,34 @@ class PresidentGame {
 
     async fetchRSSNews() {
         try {
-            const rssFeeds = [
-                'https://feeds.bbci.co.uk/news/politics/rss.xml',
-                'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml'
+            // Map feed names to backend API endpoints
+            const feedEndpoints = [
+                { name: 'bbc', url: '/api/rss?feed=bbc' },
+                { name: 'nyt', url: '/api/rss?feed=nyt' }
             ];
 
-            const randomFeed = rssFeeds[Math.floor(Math.random() * rssFeeds.length)];
+            const randomFeed = feedEndpoints[Math.floor(Math.random() * feedEndpoints.length)];
             
-            // Fetch the RSS feed directly. Note: This may fail due to CORS restrictions in browsers.
-            // For production, move RSS fetching to a backend server you control and expose an API endpoint.
-            const response = await fetch(randomFeed);
+            // Fetch the RSS feed from the backend API to avoid CORS issues.
+            const response = await fetch(randomFeed.url);
 
             if (!response.ok) {
                 throw new Error('RSS backup failed');
             }
 
-            // Parse the RSS XML directly from the response
-            const rssText = await response.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(rssText, "application/xml");
+            // Expect JSON response from backend: { feedTitle, items: [{ title, description, pubDate }] }
+            const rssJson = await response.json();
 
-            // Try to get feed title
-            let feedTitle = "RSS Feed";
-            const channel = xmlDoc.querySelector("channel");
-            if (channel && channel.querySelector("title")) {
-                feedTitle = channel.querySelector("title").textContent;
-            }
-
-            const items = Array.from(xmlDoc.querySelectorAll("item"));
+            let feedTitle = rssJson.feedTitle || "RSS Feed";
+            const items = rssJson.items || [];
             if (!items || items.length === 0) {
                 throw new Error('No RSS items found');
             }
 
             const newsStories = items.map(item => {
-                const title = item.querySelector("title") ? item.querySelector("title").textContent : "";
-                const description = item.querySelector("description") ? item.querySelector("description").textContent : "";
-                const pubDate = item.querySelector("pubDate") ? item.querySelector("pubDate").textContent : "";
+                const title = item.title || "";
+                const description = item.description || "";
+                const pubDate = item.pubDate || "";
                 return {
                     headline: title,
                     source: feedTitle,
