@@ -1039,9 +1039,7 @@ class PresidentGame {
                 case 'diplomatic_incident':
                     notification = 'International incident developing!';
                     impact = { chaos: 15, tension: 'increase' };
-                    const foreignLeader = this.relationships.find(r =>
-                        ['Vladimir Putin', 'Xi Jinping'].includes(r.name)
-                    );
+                    const foreignLeader = this.getForeignLeaders()[0];
                     if (foreignLeader) {
                         setTimeout(() => this.initiatePhoneCall(foreignLeader), 3000);
                     }
