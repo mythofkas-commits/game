@@ -1,6 +1,7 @@
 /*
 =============================================================================
 PRESIDENT SIMULATOR - TOTAL CHAOS EDITION
+With Real Live News Integration
 =============================================================================
 */
 
@@ -22,6 +23,8 @@ class PresidentGame {
         this.energy = 100;
         this.chaos = 0;
         this.score = 0;
+
+        this.NEWS_API_KEY = '5f204f388d6445f09520dd2eb9e1c563';
 
         this.currentNewsStories = [];
         this.processedNewsEvents = [];
@@ -137,23 +140,193 @@ class PresidentGame {
         this.newsInterval = null;
     }
 
-    init() {
+    async init() {
         this.updateDisplay();
         this.displayRelationships();
-        this.loadInitialNews();
+        await this.loadInitialNews();
         this.setupReporters();
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
-        this.newsInterval = setInterval(() => this.fetchPoliticalNews(), 30000);
+        this.newsInterval = setInterval(() => this.fetchRealPoliticalNews(), 120000); // Every 2 minutes
     }
 
     async loadInitialNews() {
+        const ticker = document.getElementById('newsTickerContent');
+        ticker.innerHTML = '<span class="news-item">Loading real political news...</span>';
+        
+        await this.fetchRealPoliticalNews();
+    }
+
+    async fetchRealPoliticalNews() {
+        try {
+            const response = await fetch(
+                `https://newsapi.org/v2/everything?` +
+                `q=(politics OR congress OR president OR senate OR china OR russia OR economy OR "federal reserve" OR scandal OR impeachment OR election)&` +
+                `language=en&` +
+                `sortBy=publishedAt&` +
+                `pageSize=10&` +
+                `apiKey=${this.NEWS_API_KEY}`
+            );
+
+            if (!response.ok) {
+                throw new Error('NewsAPI failed, trying RSS backup');
+            }
+
+            const data = await response.json();
+            
+            if (!data.articles || data.articles.length === 0) {
+                throw new Error('No articles found');
+            }
+
+            const newsStories = data.articles.map(article => {
+                return {
+                    headline: article.title,
+                    source: article.source.name,
+                    relevance: this.calculateRelevance(article.title, article.description),
+                    category: this.categorizeNews(article.title, article.description),
+                    actors: this.extractActors(article.title, article.description),
+                    timestamp: new Date(article.publishedAt).getTime()
+                };
+            });
+
+            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            this.displayNewsTicker();
+
+            const topStory = newsStories.find(s => s.relevance > 0.75);
+            if (topStory && !this.currentCrisis) {
+                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
+            }
+
+            console.log('✓ Fetched real news:', newsStories.length, 'stories from NewsAPI');
+            
+        } catch (error) {
+            console.error('NewsAPI failed, trying RSS backup:', error);
+            await this.fetchRSSNews();
+        }
+    }
+
+    async fetchRSSNews() {
+        try {
+            const rssFeeds = [
+                'https://feeds.bbci.co.uk/news/politics/rss.xml',
+                'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml'
+            ];
+
+            const randomFeed = rssFeeds[Math.floor(Math.random() * rssFeeds.length)];
+            
+            const response = await fetch(
+                `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(randomFeed)}&count=10`
+            );
+
+            if (!response.ok) {
+                throw new Error('RSS backup failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.status !== 'ok' || !data.items || data.items.length === 0) {
+                throw new Error('No RSS items found');
+            }
+
+            const newsStories = data.items.map(item => {
+                return {
+                    headline: item.title,
+                    source: data.feed.title || 'RSS Feed',
+                    relevance: this.calculateRelevance(item.title, item.description),
+                    category: this.categorizeNews(item.title, item.description),
+                    actors: this.extractActors(item.title, item.description),
+                    timestamp: new Date(item.pubDate).getTime()
+                };
+            });
+
+            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            this.displayNewsTicker();
+
+            const topStory = newsStories.find(s => s.relevance > 0.75);
+            if (topStory && !this.currentCrisis) {
+                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
+            }
+
+            console.log('✓ Fetched RSS news:', newsStories.length, 'stories');
+            
+        } catch (error) {
+            console.error('All news sources failed, using mock news:', error);
+            this.loadMockNews();
+        }
+    }
+
+    calculateRelevance(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+        let score = 0.5;
+
+        const highKeywords = ['president', 'congress', 'senate', 'white house', 'impeach', 'scandal', 'crisis', 'trump', 'biden'];
+        highKeywords.forEach(keyword => {
+            if (text.includes(keyword)) score += 0.1;
+        });
+
+        const medKeywords = ['election', 'bill', 'vote', 'policy', 'federal', 'democrat', 'republican', 'nato', 'china', 'russia'];
+        medKeywords.forEach(keyword => {
+            if (text.includes(keyword)) score += 0.05;
+        });
+
+        return Math.min(1, score);
+    }
+
+    categorizeNews(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+
+        if (text.match(/china|russia|ukraine|nato|foreign|international|diplomat|putin|xi/)) {
+            return 'foreign';
+        }
+        if (text.match(/scandal|investigation|corruption|resign|indict|probe|allegation/)) {
+            return 'scandal';
+        }
+        if (text.match(/market|economy|inflation|fed|unemployment|gdp|stock|trade|tariff/)) {
+            return 'economy';
+        }
+        return 'domestic';
+    }
+
+    extractActors(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+        const actors = [];
+
+        const figures = {
+            'biden': 'Joe Biden',
+            'trump': 'Donald Trump',
+            'harris': 'Kamala Harris',
+            'mcconnell': 'Mitch McConnell',
+            'schumer': 'Chuck Schumer',
+            'pelosi': 'Nancy Pelosi',
+            'putin': 'Vladimir Putin',
+            'xi jinping': 'Xi Jinping',
+            'xi': 'Xi Jinping',
+            'johnson': 'Boris Johnson',
+            'macron': 'Emmanuel Macron'
+        };
+
+        Object.entries(figures).forEach(([search, proper]) => {
+            if (text.includes(search) && !actors.includes(proper)) {
+                actors.push(proper);
+            }
+        });
+
+        if (actors.length === 0) {
+            if (text.includes('congress')) actors.push('Congress');
+            if (text.includes('senate')) actors.push('Senate');
+            if (text.includes('house')) actors.push('House');
+        }
+
+        return actors;
+    }
+
+    loadMockNews() {
         const mockNews = [
             {
                 headline: 'Congress Debates Infrastructure Bill Worth $2 Trillion',
                 source: 'Reuters',
                 relevance: 0.9,
-                category: 'budget',
+                category: 'domestic',
                 actors: ['Congress', 'Chuck Schumer', 'Mitch McConnell'],
                 timestamp: Date.now()
             },
@@ -198,61 +371,8 @@ class PresidentGame {
         if (topStory) {
             setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
         }
-    }
 
-    async fetchPoliticalNews() {
-        const newStory = this.generateDynamicNewsStory();
-
-        if (newStory.relevance >= this.newsRelevanceThreshold) {
-            this.currentNewsStories.unshift(newStory);
-            this.currentNewsStories = this.currentNewsStories.slice(0, 10);
-
-            if (newStory.relevance > 0.8 && Math.random() > 0.5) {
-                this.triggerBreakingNews(newStory);
-            }
-
-            this.displayNewsTicker();
-        }
-    }
-
-    generateDynamicNewsStory() {
-        const templates = [
-            {
-                headline: `${this.randomFrom(['Senate', 'House', 'Congress'])} ${this.randomFrom(['Blocks', 'Advances', 'Debates'])} ${this.randomFrom(['Healthcare', 'Immigration', 'Tax'])} Reform`,
-                category: 'domestic',
-                actors: ['Congress']
-            },
-            {
-                headline: `${this.randomFrom(['Russia', 'China', 'Iran'])} ${this.randomFrom(['Threatens', 'Proposes', 'Rejects'])} ${this.randomFrom(['Sanctions', 'Trade Deal', 'Military Action'])}`,
-                category: 'foreign',
-                actors: ['Vladimir Putin', 'Xi Jinping']
-            },
-            {
-                headline: `Stock Market ${this.randomFrom(['Surges', 'Plummets', 'Volatile'])} Amid ${this.randomFrom(['Tech', 'Banking', 'Energy'])} ${this.randomFrom(['Crisis', 'Boom', 'Uncertainty'])}`,
-                category: 'economy',
-                actors: ['Markets']
-            },
-            {
-                headline: `Breaking: ${this.randomFrom(['FBI', 'DOJ', 'Congress'])} Launches Investigation Into ${this.randomFrom(['Campaign Finance', 'Foreign Interference', 'Corporate Fraud'])}`,
-                category: 'scandal',
-                actors: ['DOJ']
-            }
-        ];
-
-        const template = templates[Math.floor(Math.random() * templates.length)];
-
-        return {
-            headline: template.headline,
-            source: this.randomFrom(['CNN', 'Fox News', 'Reuters', 'AP', 'NYTimes', 'WSJ']),
-            relevance: Math.random() * 0.5 + 0.5,
-            category: template.category,
-            actors: template.actors,
-            timestamp: Date.now()
-        };
-    }
-
-    randomFrom(array) {
-        return array[Math.floor(Math.random() * array.length)];
+        console.log('✓ Using mock news (fallback)');
     }
 
     getTopRelevantNews() {
@@ -349,7 +469,7 @@ class PresidentGame {
 
     callRelevantActor(story) {
         const relevantActor = this.relationships.find(r =>
-            story.actors.some(actor => r.name.includes(actor))
+            story.actors.some(actor => r.name.includes(actor) || actor.includes(r.name.split(' ').pop()))
         );
 
         if (relevantActor) {
@@ -364,7 +484,7 @@ class PresidentGame {
 
         this.processedNewsEvents.push(story.headline);
         this.generateNewsBasedCrisis(story);
-        this.showNotification(`Responding to: ${story.headline}`);
+        this.showNotification(`Responding to: ${story.headline.substring(0, 60)}...`);
     }
 
     generateNewsBasedCrisis(story) {
@@ -436,6 +556,10 @@ class PresidentGame {
         });
 
         return options;
+    }
+
+    randomFrom(array) {
+        return array[Math.floor(Math.random() * array.length)];
     }
 
     gameLoop() {
@@ -1571,7 +1695,6 @@ class PresidentGame {
     }
 }
 
-console.log('President Simulator - Total Chaos Edition loaded successfully');
-
+console.log('President Simulator - Total Chaos Edition loaded with REAL NEWS!');
 
 window.startPresidency = startPresidency;
