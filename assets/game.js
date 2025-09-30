@@ -212,13 +212,17 @@ class PresidentGame {
 
             const randomFeed = rssFeeds[Math.floor(Math.random() * rssFeeds.length)];
             
-            const response = await fetch(randomFeed);
+            // Use a public CORS proxy to fetch the RSS feed
+            const corsProxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(randomFeed);
+            const response = await fetch(corsProxyUrl);
 
             if (!response.ok) {
                 throw new Error('RSS backup failed');
             }
 
-            const rssText = await response.text();
+            // The proxy returns JSON with a "contents" field containing the RSS XML
+            const proxyData = await response.json();
+            const rssText = proxyData.contents;
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(rssText, "application/xml");
 
