@@ -109,7 +109,7 @@ body {
 
 .news-ticker-content {
     display: flex;
-    animation: scroll 30s linear infinite;
+    animation: scroll 70s linear infinite;
     white-space: nowrap;
 }
 
