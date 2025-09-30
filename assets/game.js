@@ -137,23 +137,198 @@ class PresidentGame {
         this.newsInterval = null;
     }
 
-    init() {
+    async init() {
         this.updateDisplay();
         this.displayRelationships();
-        this.loadInitialNews();
+        await this.loadInitialNews();
         this.setupReporters();
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
-        this.newsInterval = setInterval(() => this.fetchPoliticalNews(), 30000);
+        this.newsInterval = setInterval(() => this.fetchRealPoliticalNews(), 120000); // Every 2 minutes
     }
 
     async loadInitialNews() {
+        const ticker = document.getElementById('newsTickerContent');
+        ticker.innerHTML = '<span class="news-item">Loading real political news...</span>';
+        
+        await this.fetchRealPoliticalNews();
+    }
+
+    async fetchRealPoliticalNews() {
+        try {
+            // Fetch from your own backend API endpoint to avoid CORS and protect the API key
+            const response = await fetch(
+                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR "federal reserve" OR scandal OR impeachment OR election)&' +
+                'language=en&' +
+                'sortBy=publishedAt&' +
+                'pageSize=10'
+            );
+
+            if (!response.ok) {
+                throw new Error('NewsAPI failed, trying RSS backup');
+            }
+
+            const data = await response.json();
+            
+            if (!data.articles || data.articles.length === 0) {
+                throw new Error('No articles found');
+            }
+
+            const newsStories = data.articles.map(article => {
+                return {
+                    headline: article.title,
+                    source: article.source.name,
+                    relevance: this.calculateRelevance(article.title, article.description),
+                    category: this.categorizeNews(article.title, article.description),
+                    actors: this.extractActors(article.title, article.description),
+                    timestamp: new Date(article.publishedAt).getTime()
+                };
+            });
+
+            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            this.displayNewsTicker();
+
+            const topStory = newsStories.find(s => s.relevance > 0.75);
+            if (topStory && !this.currentCrisis) {
+                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
+            }
+
+            console.log('✓ Fetched real news:', newsStories.length, 'stories from NewsAPI');
+            
+        } catch (error) {
+            console.error('NewsAPI failed, trying RSS backup:', error);
+            await this.fetchRSSNews();
+        }
+    }
+
+    async fetchRSSNews() {
+        try {
+            // Map feed names to backend API endpoints
+            const feedEndpoints = [
+                { name: 'bbc', url: '/api/rss?feed=bbc' },
+                { name: 'nyt', url: '/api/rss?feed=nyt' }
+            ];
+
+            const randomFeed = feedEndpoints[Math.floor(Math.random() * feedEndpoints.length)];
+            
+            // Fetch the RSS feed from the backend API to avoid CORS issues.
+            const response = await fetch(randomFeed.url);
+
+            if (!response.ok) {
+                throw new Error('RSS backup failed');
+            }
+
+            // Expect JSON response from backend: { feedTitle, items: [{ title, description, pubDate }] }
+            const rssJson = await response.json();
+
+            let feedTitle = rssJson.feedTitle || "RSS Feed";
+            const items = rssJson.items || [];
+            if (!items || items.length === 0) {
+                throw new Error('No RSS items found');
+            }
+
+            const newsStories = items.map(item => {
+                const title = item.title || "";
+                const description = item.description || "";
+                const pubDate = item.pubDate || "";
+                return {
+                    headline: title,
+                    source: feedTitle,
+                    relevance: this.calculateRelevance(title, description),
+                    category: this.categorizeNews(title, description),
+                    actors: this.extractActors(title, description),
+                    timestamp: pubDate ? new Date(pubDate).getTime() : Date.now()
+                };
+            });
+
+            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            this.displayNewsTicker();
+
+            const topStory = newsStories.find(s => s.relevance > 0.75);
+            if (topStory && !this.currentCrisis) {
+                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
+            }
+
+            console.log('✓ Fetched RSS news:', newsStories.length, 'stories');
+            
+        } catch (error) {
+            console.error('All news sources failed, using mock news:', error);
+            this.loadMockNews();
+        }
+    }
+
+    calculateRelevance(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+        let score = 0.5;
+
+        const highKeywords = ['president', 'congress', 'senate', 'white house', 'impeach', 'scandal', 'crisis', 'trump', 'biden'];
+        highKeywords.forEach(keyword => {
+            if (text.includes(keyword)) score += 0.1;
+        });
+
+        const medKeywords = ['election', 'bill', 'vote', 'policy', 'federal', 'democrat', 'republican', 'nato', 'china', 'russia'];
+        medKeywords.forEach(keyword => {
+            if (text.includes(keyword)) score += 0.05;
+        });
+
+        return Math.min(1, score);
+    }
+
+    categorizeNews(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+
+        if (text.match(/china|russia|ukraine|nato|foreign|international|diplomat|putin|xi/)) {
+            return 'foreign';
+        }
+        if (text.match(/scandal|investigation|corruption|resign|indict|probe|allegation/)) {
+            return 'scandal';
+        }
+        if (text.match(/market|economy|inflation|fed|unemployment|gdp|stock|trade|tariff/)) {
+            return 'economy';
+        }
+        return 'domestic';
+    }
+
+    extractActors(title, description) {
+        const text = (title + ' ' + (description || '')).toLowerCase();
+        const actors = [];
+
+        const figures = {
+            'biden': 'Joe Biden',
+            'trump': 'Donald Trump',
+            'harris': 'Kamala Harris',
+            'mcconnell': 'Mitch McConnell',
+            'schumer': 'Chuck Schumer',
+            'pelosi': 'Nancy Pelosi',
+            'putin': 'Vladimir Putin',
+            'xi jinping': 'Xi Jinping',
+            'xi': 'Xi Jinping',
+            'johnson': 'Boris Johnson',
+            'macron': 'Emmanuel Macron'
+        };
+
+        Object.entries(figures).forEach(([search, proper]) => {
+            if (text.includes(search) && !actors.includes(proper)) {
+                actors.push(proper);
+            }
+        });
+
+        if (actors.length === 0) {
+            if (text.includes('congress')) actors.push('Congress');
+            if (text.includes('senate')) actors.push('Senate');
+            if (text.includes('house')) actors.push('House');
+        }
+
+        return actors;
+    }
+
+    loadMockNews() {
         const mockNews = [
             {
                 headline: 'Congress Debates Infrastructure Bill Worth $2 Trillion',
                 source: 'Reuters',
                 relevance: 0.9,
-                category: 'budget',
+                category: 'domestic',
                 actors: ['Congress', 'Chuck Schumer', 'Mitch McConnell'],
                 timestamp: Date.now()
             },
@@ -198,20 +373,89 @@ class PresidentGame {
         if (topStory) {
             setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
         }
+
+        console.log('✓ Using mock news (fallback)');
     }
 
-    async fetchPoliticalNews() {
-        const newStory = this.generateDynamicNewsStory();
+    getTopRelevantNews() {
+        return this.currentNewsStories.sort((a, b) => b.relevance - a.relevance)[0];
+    }
 
-        if (newStory.relevance >= this.newsRelevanceThreshold) {
-            this.currentNewsStories.unshift(newStory);
-            this.currentNewsStories = this.currentNewsStories.slice(0, 10);
+    triggerBreakingNews(story) {
+        const existing = document.querySelector('.breaking-news-alert');
+        if (existing) existing.remove();
 
-            if (newStory.relevance > 0.8 && Math.random() > 0.5) {
-                this.triggerBreakingNews(newStory);
+        const alert = document.createElement('div');
+        alert.className = 'breaking-news-alert active';
+        alert.innerHTML = `
+            <div class="news-source">BREAKING NEWS - ${story.source}</div>
+            <h2 style="color: #fff; margin-bottom: 20px;">${story.headline}</h2>
+            <p style="color: #ddd; margin-bottom: 20px;">This requires your immediate attention!</p>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                <button class="decision-btn" data-action="dismiss">Dismiss</button>
+                <button class="decision-btn" data-action="tweet">Tweet Response</button>
+                <button class="decision-btn" data-action="call">Emergency Call</button>
+                <button class="decision-btn" data-action="crisis">Crisis Mode</button>
+            </div>
+        `;
+
+        alert.querySelectorAll('.decision-btn[data-action]').forEach(button => {
+            const action = button.dataset.action;
+            button.addEventListener('click', () => this.quickNewsResponse(action, story));
+        });
+        document.body.appendChild(alert);
+
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+                this.chaos += 5;
+                this.showNotification('Ignored breaking news - chaos increases!');
+                this.updateDisplay();
             }
+        }, 10000);
+    }
 
-            this.displayNewsTicker();
+    quickNewsResponse(action, story) {
+        const alert = document.querySelector('.breaking-news-alert');
+        if (alert) alert.remove();
+
+        if (!story) return;
+
+        this.history.newsResponses.push({
+            story,
+            action,
+            timestamp: Date.now()
+        });
+
+        switch (action) {
+            case 'dismiss':
+                this.chaos += 10;
+                this.showNotification('Media criticizes your silence!');
+                break;
+            case 'tweet':
+                document.getElementById('tweetInput').value = `Regarding ${story.headline.substring(0, 50)}...`;
+                document.getElementById('tweetInput').focus();
+                break;
+            case 'call':
+                this.callRelevantActor(story);
+                break;
+            case 'crisis':
+                this.generateNewsBasedCrisis(story);
+                break;
+        }
+
+        this.updateDisplay();
+    }
+
+    callRelevantActor(story) {
+        const relevantActor = this.relationships.find(r =>
+            story.actors.some(actor => r.name.includes(actor) || actor.includes(r.name.split(' ').pop()))
+        );
+
+        if (relevantActor) {
+            this.initiatePhoneCall(relevantActor);
+        } else {
+            this.showNotification('No direct contact available.');
         }
     }
 
