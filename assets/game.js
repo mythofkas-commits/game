@@ -160,13 +160,12 @@ class PresidentGame {
 
     async fetchRealPoliticalNews() {
         try {
+            // Fetch from your own backend API endpoint to avoid CORS and protect the API key
             const response = await fetch(
-                `https://newsapi.org/v2/everything?` +
-                `q=(politics OR congress OR president OR senate OR china OR russia OR economy OR "federal reserve" OR scandal OR impeachment OR election)&` +
-                `language=en&` +
-                `sortBy=publishedAt&` +
-                `pageSize=10&` +
-                `apiKey=${this.NEWS_API_KEY}`
+                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR "federal reserve" OR scandal OR impeachment OR election)&' +
+                'language=en&' +
+                'sortBy=publishedAt&' +
+                'pageSize=10'
             );
 
             if (!response.ok) {
