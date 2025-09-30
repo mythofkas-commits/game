@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/news.js": {
+      "maxDuration": 30
+    },
+    "api/rss.js": {
+      "maxDuration": 30
+    }
+  }
+}
