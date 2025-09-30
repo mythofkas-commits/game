@@ -612,7 +612,7 @@ class PresidentGame {
         }
 
         const foreignRelations = this.relationships.filter(r =>
-            ['Vladimir Putin', 'Xi Jinping', 'Boris Johnson'].includes(r.name)
+            ['Vladimir Putin', 'Xi Jinping', 'Rishi Sunak'].includes(r.name)
         );
         const avgTrust = foreignRelations.reduce((sum, r) => sum + r.trust, 0) / foreignRelations.length;
 
