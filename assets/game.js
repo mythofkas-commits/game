@@ -212,17 +212,16 @@ class PresidentGame {
 
             const randomFeed = rssFeeds[Math.floor(Math.random() * rssFeeds.length)];
             
-            // Use a public CORS proxy to fetch the RSS feed
-            const corsProxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(randomFeed);
-            const response = await fetch(corsProxyUrl);
+            // Fetch the RSS feed directly. Note: This may fail due to CORS restrictions in browsers.
+            // For production, move RSS fetching to a backend server you control and expose an API endpoint.
+            const response = await fetch(randomFeed);
 
             if (!response.ok) {
                 throw new Error('RSS backup failed');
             }
 
-            // The proxy returns JSON with a "contents" field containing the RSS XML
-            const proxyData = await response.json();
-            const rssText = proxyData.contents;
+            // Parse the RSS XML directly from the response
+            const rssText = await response.text();
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(rssText, "application/xml");
 
