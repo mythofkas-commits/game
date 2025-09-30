@@ -214,28 +214,39 @@ class PresidentGame {
 
             const randomFeed = rssFeeds[Math.floor(Math.random() * rssFeeds.length)];
             
-            const response = await fetch(
-                `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(randomFeed)}&count=10`
-            );
+            const response = await fetch(randomFeed);
 
             if (!response.ok) {
                 throw new Error('RSS backup failed');
             }
 
-            const data = await response.json();
-            
-            if (data.status !== 'ok' || !data.items || data.items.length === 0) {
+            const rssText = await response.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(rssText, "application/xml");
+
+            // Try to get feed title
+            let feedTitle = "RSS Feed";
+            const channel = xmlDoc.querySelector("channel");
+            if (channel && channel.querySelector("title")) {
+                feedTitle = channel.querySelector("title").textContent;
+            }
+
+            const items = Array.from(xmlDoc.querySelectorAll("item"));
+            if (!items || items.length === 0) {
                 throw new Error('No RSS items found');
             }
 
-            const newsStories = data.items.map(item => {
+            const newsStories = items.map(item => {
+                const title = item.querySelector("title") ? item.querySelector("title").textContent : "";
+                const description = item.querySelector("description") ? item.querySelector("description").textContent : "";
+                const pubDate = item.querySelector("pubDate") ? item.querySelector("pubDate").textContent : "";
                 return {
-                    headline: item.title,
-                    source: data.feed.title || 'RSS Feed',
-                    relevance: this.calculateRelevance(item.title, item.description),
-                    category: this.categorizeNews(item.title, item.description),
-                    actors: this.extractActors(item.title, item.description),
-                    timestamp: new Date(item.pubDate).getTime()
+                    headline: title,
+                    source: feedTitle,
+                    relevance: this.calculateRelevance(title, description),
+                    category: this.categorizeNews(title, description),
+                    actors: this.extractActors(title, description),
+                    timestamp: pubDate ? new Date(pubDate).getTime() : Date.now()
                 };
             });
 
