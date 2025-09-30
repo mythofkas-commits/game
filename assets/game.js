@@ -24,7 +24,8 @@ class PresidentGame {
         this.chaos = 0;
         this.score = 0;
 
-        this.NEWS_API_KEY = '5f204f388d6445f09520dd2eb9e1c563';
+        // NEWS_API_KEY removed from client-side code for security.
+        // News data should be fetched from a secure backend endpoint.
 
         this.currentNewsStories = [];
         this.processedNewsEvents = [];
