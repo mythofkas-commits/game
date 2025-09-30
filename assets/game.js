@@ -6,8 +6,6 @@ With Real Live News Integration
 */
 
 let game = null;
-window.game = null;
-
 function startPresidency() {
     document.getElementById('introScreen').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'block';
