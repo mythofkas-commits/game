@@ -105,15 +105,15 @@ class PresidentGame {
                 currentIssues: ['trade', 'taiwan', 'technology']
             },
             {
-                name: 'Boris Johnson',
-                trust: 70,
-                respect: 45,
-                fear: 5,
+                name: 'Rishi Sunak',
+                trust: 65,
+                respect: 50,
+                fear: 10,
                 role: 'UK PM',
-                personality: 'chaotic',
+                personality: 'pragmatic',
                 lastInteraction: null,
                 history: [],
-                currentIssues: ['brexit', 'trade', 'nato']
+                currentIssues: ['inflation', 'cost of living', 'ukraine', 'trade']
             }
         ];
 
