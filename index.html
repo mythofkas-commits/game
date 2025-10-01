@@ -72,11 +72,11 @@
         </div>
 
         <!-- CRISIS PANEL -->
-        <div class="crisis-panel" id="crisisPanel">
+        <div class="crisis-panel" id="crisisPanel" data-testid="crisis-panel">
             <h2 id="crisisTitle" style="color: #ff0000; margin-bottom: 10px;">Crisis Loading...</h2>
             <div id="affectedCenters"></div>
             <p id="crisisDescription" style="color: #ddd; margin: 15px 0;">Preparing situation...</p>
-            <div id="crisisOptions"></div>
+            <div id="crisisOptions" data-testid="crisis-options"></div>
             <button class="decision-btn" style="background: #1da1f2; color: #fff; margin-top: 15px;" 
                     onclick="game.startPressConference()">
                 📺 Hold Press Conference
