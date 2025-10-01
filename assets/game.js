@@ -394,8 +394,8 @@ class PresidentGame {
             let shouldRetry = false;
             if (err && typeof err === 'object') {
                 // If error is from fetchJson or fetch, check status
-                if (err.message) {
-                    let status = null;
+                if (err.message && /HTTP (\d+)/.test(err.message)) {
+                    const status = Number(err.message.match(/HTTP (\d+)/)[1]);
                     // Match 'ai-narrative <code>' or 'HTTP <code>'
                     let match = err.message.match(/ai-narrative (\d+)/);
                     if (!match) {
