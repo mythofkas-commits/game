@@ -394,14 +394,22 @@ class PresidentGame {
             let shouldRetry = false;
             if (err && typeof err === 'object') {
                 // If error is from fetchJson or fetch, check status
-                if (err.message && /ai-narrative (\d+)/.test(err.message)) {
-                    const status = Number(err.message.match(/ai-narrative (\d+)/)[1]);
-                    if (status >= 500 && status < 600) {
+                if (err.message) {
+                    let status = null;
+                    // Match 'ai-narrative <code>' or 'HTTP <code>'
+                    let match = err.message.match(/ai-narrative (\d+)/);
+                    if (!match) {
+                        match = err.message.match(/^HTTP (\d+)/);
+                    }
+                    if (match) {
+                        status = Number(match[1]);
+                        if (status >= 500 && status < 600) {
+                            shouldRetry = true;
+                        }
+                    } else if (err.name === 'TypeError' || err.message?.includes('NetworkError')) {
+                        // Network error
                         shouldRetry = true;
                     }
-                } else if (err.name === 'TypeError' || err.message?.includes('NetworkError')) {
-                    // Network error
-                    shouldRetry = true;
                 }
             }
             if (shouldRetry) {
