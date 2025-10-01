@@ -139,8 +139,25 @@ class PresidentGame {
         this.pendingCascades = [];
         this.respondingToCrisis = false; // Track if responding to crisis via tweet
         
+        this.debug = new URLSearchParams(location.search).has('debug');
+        this.crisisAIEligibleCount = Number(localStorage.getItem('aiEligibleCount') || 0);
+
+        function mulberry32(a) {
+            return function () {
+                a |= 0;
+                a = a + 0x6D2B79F5 | 0;
+                let t = Math.imul(a ^ a >>> 15, 1 | a);
+                t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+        this.rand = this.debug ? mulberry32(Number(localStorage.getItem('seed') || 1234)) : Math.random;
+
+        this.now = () => (this.debug && this._t != null) ? this._t : Date.now();
+
         // Analytics tracking
-        this.sessionId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const randomId = this.debug ? this.rand() : Math.random();
+        this.sessionId = Date.now() + '-' + randomId.toString(36).substr(2, 9);
         this.sessionStart = Date.now();
         this.analytics = {
             events: [],
@@ -179,7 +196,7 @@ class PresidentGame {
         try {
             // Get existing analytics
             const existing = JSON.parse(localStorage.getItem('presidentAnalytics') || '{"sessions": []}');
-            
+
             // Find or create current session
             let session = existing.sessions.find(s => s.sessionId === this.sessionId);
             if (!session) {
@@ -215,6 +232,102 @@ class PresidentGame {
         }
     }
 
+    saveAICounter() {
+        try {
+            localStorage.setItem('aiEligibleCount', String(this.crisisAIEligibleCount));
+        } catch {
+            // ignore storage failures
+        }
+    }
+
+    logDebug(...args) {
+        if (this.debug) console.debug('[DBG]', ...args);
+    }
+
+    installDebugOverlay() {
+        if (!this.debug || document.getElementById('debugPane')) return;
+        const pane = document.createElement('div');
+        pane.id = 'debugPane';
+        Object.assign(pane.style, {
+            position: 'fixed',
+            right: '8px',
+            bottom: '8px',
+            width: '360px',
+            maxHeight: '50vh',
+            overflow: 'auto',
+            background: 'rgba(0,0,0,0.85)',
+            color: '#0f0',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            padding: '8px',
+            border: '1px solid #333',
+            zIndex: 99999
+        });
+        pane.innerHTML = '<div style="color:#9f9">debug on</div><pre id="debugLog"></pre>';
+        document.body.appendChild(pane);
+    }
+
+    debugTrace(title, payload) {
+        if (!this.debug) return;
+        if (!document.getElementById('debugPane')) this.installDebugOverlay();
+        const pre = document.getElementById('debugLog');
+        if (pre) pre.textContent =
+            `[${new Date().toLocaleTimeString()}] ${title}\n` +
+            `${JSON.stringify(payload, null, 2)}\n\n` +
+            pre.textContent.slice(0, 20000);
+    }
+
+    snapshotState() {
+        return {
+            chaos: this.chaos,
+            energy: this.energy,
+            power: Object.fromEntries(this.powerCenters.map(p => [p.id, p.value]))
+        };
+    }
+
+    diffStates(a, b) {
+        const d = {};
+        if (a.chaos !== b.chaos) d.chaos = [a.chaos, b.chaos];
+        if (a.energy !== b.energy) d.energy = [a.energy, b.energy];
+        const power = {};
+        for (const k of Object.keys(a.power)) {
+            if (a.power[k] !== b.power[k]) power[k] = [a.power[k], b.power[k]];
+        }
+        if (Object.keys(power).length) d.power = power;
+        return d;
+    }
+
+    explainDisabled(btn, reason) {
+        if (!btn) return;
+        btn.setAttribute('title', reason);
+        btn.dataset.disabledReason = reason;
+    }
+
+    async fetchJson(url, init) {
+        if (this.debug && url.includes('/api/ai-narrative')) {
+            return {
+                narrative: {
+                    headline: 'Test Narrative',
+                    description: 'stub',
+                    impacts: {
+                        chaos: -2,
+                        energy: 5,
+                        relationships: [{ center: 'media', change: 1 }]
+                    }
+                }
+            };
+        }
+        const res = await fetch(url, init);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+    }
+
+    assert(cond, msg) {
+        if (!cond) {
+            throw new Error('Invariant: ' + msg);
+        }
+    }
+
     async init() {
         // Show loading screen
         this.showLoadingScreen();
@@ -239,9 +352,27 @@ class PresidentGame {
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
         this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000);
-        
+
         // Track game start for analytics
         this.trackEvent('game_started');
+
+        if (this.debug) this.installDebugOverlay();
+
+        const origHandleDecision = this.handleDecision.bind(this);
+        this.handleDecision = (option) => {
+            const before = this.snapshotState();
+            this.debugTrace('handleDecision:before', { option });
+            try {
+                return origHandleDecision(option);
+            } finally {
+                const delta = this.diffStates(before, this.snapshotState());
+                if (!Object.keys(delta).length) {
+                    this.debugTrace('no effect detected', { option });
+                } else {
+                    this.debugTrace('handleDecision:after', delta);
+                }
+            }
+        };
     }
 
     showLoadingError() {
@@ -463,7 +594,7 @@ class PresidentGame {
         // Apply game effects
         this.chaos = Math.min(100, this.chaos + analysis.chaos);
         this.energy -= analysis.energyCost;
-        this.score += analysis.score;
+        
 
         input.value = '';
         
@@ -482,7 +613,7 @@ class PresidentGame {
             // Generate next crisis
             setTimeout(() => {
                 if (this.currentNewsStories.length > 0) {
-                    const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
+                    const randomNews = this.currentNewsStories[Math.floor(this.rand() * this.currentNewsStories.length)];
                     this.generateAdaptiveCrisis(randomNews);
                 } else {
                     this.generateContextualCrisis();
@@ -500,7 +631,6 @@ class PresidentGame {
             powerEffects: {},
             chaos: 5,
             energyCost: 5,
-            score: 10,
             warnings: []
         };
 
@@ -625,9 +755,6 @@ class PresidentGame {
             }
         });
 
-        // SCORE CALCULATION
-        analysis.score = Math.abs(analysis.chaos) * 5 + Object.values(analysis.powerEffects).reduce((sum, val) => sum + Math.abs(val), 0) * 2;
-
         return analysis;
     }
 
@@ -708,7 +835,7 @@ class PresidentGame {
 
             // Trigger breaking news for high relevance
             const breakingNews = this.currentNewsStories.filter(s => s.relevance > 0.75);
-            if (breakingNews.length > 0 && Math.random() < 0.4) {
+            if (breakingNews.length > 0 && this.rand() < 0.4) {
                 setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
@@ -723,7 +850,7 @@ class PresidentGame {
     async fetchRSSNews() {
         try {
             const feeds = ['bbc', 'nyt'];
-            const randomFeed = feeds[Math.floor(Math.random() * feeds.length)];
+            const randomFeed = feeds[Math.floor(this.rand() * feeds.length)];
             const response = await fetch(`/api/rss?feed=${randomFeed}`);
 
             if (!response.ok) throw new Error('RSS failed');
@@ -1166,7 +1293,7 @@ class PresidentGame {
             effects: affectedCenters.map(id => {
                 if (id === 'public') return { center: id, change: 12 };
                 if (id === 'media') return { center: id, change: -8 };
-                return { center: id, change: Math.random() > 0.5 ? 5 : -5 };
+                return { center: id, change: this.rand() > 0.5 ? 5 : -5 };
             }),
             chaos: 15,
             energy: 5,
@@ -1231,7 +1358,10 @@ class PresidentGame {
         if (!this.currentCrisis) return;
 
         const crisis = this.currentCrisis;
-        
+
+        this.assert(Array.isArray(crisis.options) && crisis.options.length, 'crisis has no options');
+        this.assert(Number.isFinite(this.chaos) && this.chaos >= 0 && this.chaos <= 100, 'chaos out of range');
+
         document.getElementById('crisisTitle').textContent = crisis.title;
         document.getElementById('crisisDescription').innerHTML = crisis.description;
 
@@ -1247,11 +1377,12 @@ class PresidentGame {
 
         crisis.options.forEach(option => {
             const btn = document.createElement('button');
-            btn.className = 'decision-btn';
+            btn.classList.add('decision-btn');
+            btn.setAttribute('data-testid', 'decision-btn');
             btn.innerHTML = `
                 ${option.text}
                 <div class="option-preview">
-                    Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} | 
+                    Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} |
                     Energy: -${option.energy}
                 </div>
             `;
@@ -1305,7 +1436,7 @@ class PresidentGame {
         // Generate next crisis after delay
         setTimeout(() => {
             if (this.currentNewsStories.length > 0) {
-                const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
+                const randomNews = this.currentNewsStories[Math.floor(this.rand() * this.currentNewsStories.length)];
                 this.generateAdaptiveCrisis(randomNews);
             } else {
                 this.generateContextualCrisis();
@@ -1507,9 +1638,9 @@ class PresidentGame {
         this.score += 10;
 
         // Small random power center drift
-        if (Math.random() < 0.3) {
-            const randomCenter = this.powerCenters[Math.floor(Math.random() * this.powerCenters.length)];
-            const drift = (Math.random() - 0.5) * 4;
+        if (this.rand() < 0.3) {
+            const randomCenter = this.powerCenters[Math.floor(this.rand() * this.powerCenters.length)];
+            const drift = (this.rand() - 0.5) * 4;
             this.updatePowerCenter(randomCenter.id, drift, 'Daily drift');
         }
 
@@ -1534,7 +1665,7 @@ class PresidentGame {
         });
 
         // Quick negotiation
-        const roll = Math.random() * 100;
+        const roll = this.rand() * 100;
         const successChance = caller.trust;
 
         if (roll < successChance) {
@@ -1608,7 +1739,7 @@ class PresidentGame {
             attack: { media: -15, public: 10, chaos: 15 },
             deflect: { media: -5, public: 0, chaos: 5 },
             answer: { media: 10, public: 5, chaos: -5 },
-            joke: { media: Math.random() > 0.5 ? 10 : -10, public: 5, chaos: 10 }
+            joke: { media: this.rand() > 0.5 ? 10 : -10, public: 5, chaos: 10 }
         };
 
         const effect = effects[style];
@@ -1662,6 +1793,9 @@ class PresidentGame {
         setTimeout(() => notif.remove(), 3000);
     }
 }
+
+window.addEventListener('unhandledrejection', e => window.game?.debugTrace('unhandled rejection', { reason: String(e.reason) }));
+window.addEventListener('error', e => window.game?.debugTrace('error', { msg: e.message, src: e.filename, line: e.lineno }));
 
 console.log('President Simulator - Smart Twitter Edition loaded');
 window.startPresidency = startPresidency;
