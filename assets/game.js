@@ -463,7 +463,7 @@ class PresidentGame {
         // Apply game effects
         this.chaos = Math.min(100, this.chaos + analysis.chaos);
         this.energy -= analysis.energyCost;
-        this.score += analysis.score;
+        
 
         input.value = '';
         
@@ -500,7 +500,6 @@ class PresidentGame {
             powerEffects: {},
             chaos: 5,
             energyCost: 5,
-            score: 10,
             warnings: []
         };
 
@@ -624,9 +623,6 @@ class PresidentGame {
                 analysis.warnings.push('Typo goes viral!');
             }
         });
-
-        // SCORE CALCULATION
-        analysis.score = Math.abs(analysis.chaos) * 5 + Object.values(analysis.powerEffects).reduce((sum, val) => sum + Math.abs(val), 0) * 2;
 
         return analysis;
     }
