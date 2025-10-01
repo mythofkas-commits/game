@@ -481,7 +481,7 @@ class PresidentGame {
         const chaosValue = Number(ai.impacts.chaos || 0);
         const chaos = Number.isFinite(chaosValue) ? chaosValue : 0;
         const energyRaw = Number(ai.impacts.energy || 0);
-        const energy = Number.isFinite(energyRaw) ? energyRaw : 8;
+        const energy = Number.isFinite(energyRaw) ? energyRaw : 0;
         const text = typeof ai.title === 'string' && ai.title.trim() ? ai.title.trim() : 'AI Response';
 
         return {
