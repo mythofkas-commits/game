@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>President Simulator - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .admin-header {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-title {
+            font-size: 32px;
+            color: #ffd700;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .admin-btn {
+            background: #ffd700;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .admin-btn:hover {
+            background: #ffed4e;
+            transform: translateY(-2px);
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .admin-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-title {
+            font-size: 20px;
+            color: #ffd700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #ddd;
+        }
+
+        .stat-value {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .log-entry {
+            padding: 10px;
+            border-left: 3px solid #ffd700;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .log-time {
+            color: #aaa;
+            font-size: 11px;
+        }
+
+        .chart-container {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 150px;
+            gap: 5px;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(to top, #ffd700, #ffed4e);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .bar:hover {
+            background: linear-gradient(to top, #ffed4e, #fff);
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .bar-value {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .color-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .color-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .color-input {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .session-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .session-item:hover {
+            background: rgba(255,215,0,0.1);
+            transform: translateX(5px);
+        }
+
+        .session-active {
+            border-left: 4px solid #00ff00;
+        }
+
+        .export-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        .export-btn:hover {
+            background: #00dd00;
+            transform: scale(1.05);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 15px;
+        }
+
+        .tab {
+            background: rgba(255,255,255,0.1);
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: #ffd700;
+            color: #000;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .metric-big {
+            font-size: 48px;
+            color: #ffd700;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,215,0,0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,215,0,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h1 class="admin-title">🎮 President Simulator - Admin Dashboard</h1>
+        <div class="admin-actions">
+            <button class="admin-btn" onclick="refreshData()">🔄 Refresh</button>
+            <button class="admin-btn" onclick="clearAllData()">🗑️ Clear Data</button>
+            <button class="admin-btn" onclick="window.open('index.html', '_blank')">🎮 Play Game</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('overview')">📊 Overview</div>
+        <div class="tab" onclick="switchTab('sessions')">👥 Sessions</div>
+        <div class="tab" onclick="switchTab('analytics')">📈 Analytics</div>
+        <div class="tab" onclick="switchTab('logs')">📝 Logs</div>
+        <div class="tab" onclick="switchTab('design')">🎨 Design</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div id="tab-overview" class="tab-content active">
+        <div class="admin-grid">
+            <div class="admin-card">
+                <div class="card-title">📊 Quick Stats</div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Games Played</span>
+                    <span class="stat-value" id="totalGames">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Active Sessions</span>
+                    <span class="stat-value" id="activeSessions">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Session Duration</span>
+                    <span class="stat-value" id="avgDuration">0m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Tweets Sent</span>
+                    <span class="stat-value" id="totalTweets">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Decisions Made</span>
+                    <span class="stat-value" id="totalDecisions">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Chaos Level</span>
+                    <span class="stat-value" id="avgChaos">0%</span>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">🏆 Top Scores</div>
+                <div id="topScores"></div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">📰 News Sources</div>
+                <div class="chart-container">
+                    <div class="bar-chart" id="newsSourcesChart"></div>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">⚡ Most Common Decisions</div>
+                <div id="commonDecisions"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SESSIONS TAB -->
+    <div id="tab-sessions" class="tab-content">
+        <div class="admin-card">
+            <div class="card-title">👥 Recent Sessions</div>
+            <div class="session-list" id="sessionsList"></div>
+        </div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="tab-analytics" class="tab-content">
+        <div class="admin-grid">
+            <div class="admin-card">
+                <div class="card-title">📈 Power Center Trends</div>
+                <div id="powerTrends"></div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">🐦 Tweet Analytics</div>
+                <div id="tweetAnalytics"></div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">🎯 Crisis Categories</div>
+                <div class="chart-container">
+                    <div class="bar-chart" id="crisisChart"></div>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-title">📊 Player Behavior</div>
+                <div id="behaviorStats"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS TAB -->
+    <div id="tab-logs" class="tab-content">
+        <div class="admin-card">
+            <div class="card-title">📝 Real-Time Game Events</div>
+            <div class="log-container" id="logsContainer"></div>
+            <button class="export-btn" onclick="exportLogs()">💾 Export Logs</button>
+        </div>
+    </div>
+
+    <!-- DESIGN TAB -->
+    <div id="tab-design" class="tab-content">
+        <div class="admin-card">
+            <div class="card-title">🎨 Color Scheme Editor</div>
+            <p style="color: #ddd; margin-bottom: 15px;">Customize the game's color scheme (changes saved locally)</p>
+            <div class="color-picker-grid">
+                <div class="color-item">
+                    <label>Background</label>
+                    <input type="color" class="color-input" id="colorBg" value="#0f1419">
+                </div>
+                <div class="color-item">
+                    <label>Accent (Gold)</label>
+                    <input type="color" class="color-input" id="colorAccent" value="#ffd700">
+                </div>
+                <div class="color-item">
+                    <label>Crisis Red</label>
+                    <input type="color" class="color-input" id="colorCrisis" value="#ff0000">
+                </div>
+                <div class="color-item">
+                    <label>Twitter Blue</label>
+                    <input type="color" class="color-input" id="colorTwitter" value="#1da1f2">
+                </div>
+                <div class="color-item">
+                    <label>Success Green</label>
+                    <input type="color" class="color-input" id="colorSuccess" value="#00ff00">
+                </div>
+                <div class="color-item">
+                    <label>Text Color</label>
+                    <input type="color" class="color-input" id="colorText" value="#ffffff">
+                </div>
+            </div>
+            <button class="admin-btn" style="width: 100%; margin-top: 20px;" onclick="saveColorScheme()">💾 Save Color Scheme</button>
+            <button class="admin-btn" style="width: 100%; margin-top: 10px; background: #ff0000;" onclick="resetColorScheme()">🔄 Reset to Default</button>
+        </div>
+
+        <div class="admin-card" style="margin-top: 20px;">
+            <div class="card-title">📤 Data Export</div>
+            <button class="export-btn" onclick="exportAllData()">📊 Export All Analytics (JSON)</button>
+            <button class="export-btn" onclick="exportCSV()">📋 Export as CSV</button>
+        </div>
+    </div>
+
+    <script>
+        let analytics = { sessions: [] };
+
+        function loadAnalytics() {
+            try {
+                const data = localStorage.getItem('presidentAnalytics');
+                if (data) {
+                    analytics = JSON.parse(data);
+                }
+            } catch (e) {
+                console.error('Failed to load analytics:', e);
+            }
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            updateOverview();
+            updateSessions();
+            updateAnalytics();
+            updateLogs();
+        }
+
+        function updateOverview() {
+            const sessions = analytics.sessions || [];
+            
+            // Total games
+            document.getElementById('totalGames').textContent = sessions.length;
+            
+            // Active sessions (within last hour)
+            const oneHourAgo = Date.now() - 3600000;
+            const active = sessions.filter(s => s.lastUpdate > oneHourAgo).length;
+            document.getElementById('activeSessions').textContent = active;
+            
+            // Average duration
+            const avgDur = sessions.length > 0 
+                ? sessions.reduce((sum, s) => sum + (s.duration || 0), 0) / sessions.length 
+                : 0;
+            document.getElementById('avgDuration').textContent = Math.round(avgDur / 60000) + 'm';
+            
+            // Total tweets
+            const totalTweets = sessions.reduce((sum, s) => {
+                return sum + s.events.filter(e => e.type === 'tweet_sent').length;
+            }, 0);
+            document.getElementById('totalTweets').textContent = totalTweets;
+            
+            // Total decisions
+            const totalDecisions = sessions.reduce((sum, s) => {
+                return sum + s.events.filter(e => e.type === 'decision_made').length;
+            }, 0);
+            document.getElementById('totalDecisions').textContent = totalDecisions;
+            
+            // Average chaos
+            const validSessions = sessions.filter(s => s.finalState);
+            const avgChaos = validSessions.length > 0
+                ? validSessions.reduce((sum, s) => sum + s.finalState.chaos, 0) / validSessions.length
+                : 0;
+            document.getElementById('avgChaos').textContent = Math.round(avgChaos) + '%';
+            
+            // Top scores
+            const topScores = sessions
+                .filter(s => s.finalState)
+                .sort((a, b) => b.finalState.score - a.finalState.score)
+                .slice(0, 5);
+            
+            document.getElementById('topScores').innerHTML = topScores.map((s, i) => `
+                <div class="stat-item">
+                    <span>${i + 1}. Day ${s.finalState.day}</span>
+                    <span class="stat-value">${s.finalState.score}</span>
+                </div>
+            `).join('') || '<p style="color: #aaa;">No games completed yet</p>';
+            
+            // Common decisions
+            const decisions = {};
+            sessions.forEach(s => {
+                s.events.filter(e => e.type === 'decision_made').forEach(e => {
+                    const opt = e.option || 'Unknown';
+                    decisions[opt] = (decisions[opt] || 0) + 1;
+                });
+            });
+            
+            const topDecisions = Object.entries(decisions)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            
+            document.getElementById('commonDecisions').innerHTML = topDecisions.map(([decision, count]) => `
+                <div class="stat-item">
+                    <span class="stat-label">${decision.substring(0, 30)}...</span>
+                    <span class="stat-value">${count}</span>
+                </div>
+            `).join('') || '<p style="color: #aaa;">No decisions yet</p>';
+        }
+
+        function updateSessions() {
+            const sessions = analytics.sessions || [];
+            const sessionsList = document.getElementById('sessionsList');
+            
+            const oneHourAgo = Date.now() - 3600000;
+            
+            sessionsList.innerHTML = sessions.slice().reverse().map(s => {
+                const isActive = s.lastUpdate > oneHourAgo;
+                const duration = Math.round((s.duration || 0) / 60000);
+                const startTime = new Date(s.startTime).toLocaleString();
+                
+                return `
+                    <div class="session-item ${isActive ? 'session-active' : ''}" onclick="viewSession('${s.sessionId}')">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <strong>${isActive ? '🟢 Active' : '⚪ Ended'}</strong>
+                            <span>${duration}m</span>
+                        </div>
+                        <div style="font-size: 12px; color: #aaa;">
+                            ${startTime} • ${s.events.length} events
+                        </div>
+                        ${s.finalState ? `
+                            <div style="font-size: 11px; color: #ffd700; margin-top: 5px;">
+                                Score: ${s.finalState.score} • Chaos: ${s.finalState.chaos}%
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('') || '<p style="color: #aaa;">No sessions yet</p>';
+        }
+
+        function updateAnalytics() {
+            // Power center trends
+            const sessions = analytics.sessions || [];
+            const powerTrends = {};
+            
+            sessions.filter(s => s.finalState).forEach(s => {
+                s.finalState.powerCenters.forEach(p => {
+                    if (!powerTrends[p.id]) powerTrends[p.id] = [];
+                    powerTrends[p.id].push(p.value);
+                });
+            });
+            
+            document.getElementById('powerTrends').innerHTML = Object.entries(powerTrends).map(([id, values]) => {
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                return `
+                    <div class="stat-item">
+                        <span class="stat-label">${id.charAt(0).toUpperCase() + id.slice(1)}</span>
+                        <span class="stat-value">${Math.round(avg)}%</span>
+                    </div>
+                `;
+            }).join('') || '<p style="color: #aaa;">No data yet</p>';
+            
+            // Tweet analytics
+            const tweets = [];
+            sessions.forEach(s => {
+                s.events.filter(e => e.type === 'tweet_sent').forEach(e => tweets.push(e));
+            });
+            
+            const tones = {};
+            tweets.forEach(t => {
+                const tone = t.tone || 'neutral';
+                tones[tone] = (tones[tone] || 0) + 1;
+            });
+            
+            document.getElementById('tweetAnalytics').innerHTML = Object.entries(tones).map(([tone, count]) => `
+                <div class="stat-item">
+                    <span class="stat-label">${tone.charAt(0).toUpperCase() + tone.slice(1)}</span>
+                    <span class="stat-value">${count}</span>
+                </div>
+            `).join('') || '<p style="color: #aaa;">No tweets yet</p>';
+            
+            // Crisis categories chart
+            const crisisCategories = {};
+            sessions.forEach(s => {
+                s.events.filter(e => e.type === 'decision_made' && e.category).forEach(e => {
+                    crisisCategories[e.category] = (crisisCategories[e.category] || 0) + 1;
+                });
+            });
+            
+            const maxCrisis = Math.max(...Object.values(crisisCategories), 1);
+            document.getElementById('crisisChart').innerHTML = Object.entries(crisisCategories).map(([cat, count]) => {
+                const height = (count / maxCrisis) * 100;
+                return `
+                    <div class="bar" style="height: ${height}%;">
+                        <div class="bar-value">${count}</div>
+                        <div class="bar-label">${cat}</div>
+                    </div>
+                `;
+            }).join('') || '<p style="color: #aaa; text-align: center;">No crisis data yet</p>';
+        }
+
+        function updateLogs() {
+            const sessions = analytics.sessions || [];
+            const allEvents = [];
+            
+            sessions.forEach(s => {
+                s.events.forEach(e => {
+                    allEvents.push({ ...e, sessionId: s.sessionId });
+                });
+            });
+            
+            allEvents.sort((a, b) => b.timestamp - a.timestamp);
+            
+            document.getElementById('logsContainer').innerHTML = allEvents.slice(0, 50).map(e => {
+                const time = new Date(e.timestamp).toLocaleTimeString();
+                return `
+                    <div class="log-entry">
+                        <div class="log-time">${time} • ${e.type}</div>
+                        <div>${JSON.stringify(e).substring(0, 100)}...</div>
+                    </div>
+                `;
+            }).join('') || '<p style="color: #aaa;">No events logged yet</p>';
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        function refreshData() {
+            loadAnalytics();
+            alert('✅ Data refreshed!');
+        }
+
+        function clearAllData() {
+            if (confirm('⚠️ Are you sure? This will delete ALL game analytics!')) {
+                localStorage.removeItem('presidentAnalytics');
+                analytics = { sessions: [] };
+                updateDashboard();
+                alert('🗑️ All data cleared!');
+            }
+        }
+
+        function viewSession(sessionId) {
+            const session = analytics.sessions.find(s => s.sessionId === sessionId);
+            if (session) {
+                alert(`Session Details:\n\nDuration: ${Math.round(session.duration / 60000)}m\nEvents: ${session.events.length}\nScore: ${session.finalState?.score || 'N/A'}`);
+            }
+        }
+
+        function saveColorScheme() {
+            const scheme = {
+                bg: document.getElementById('colorBg').value,
+                accent: document.getElementById('colorAccent').value,
+                crisis: document.getElementById('colorCrisis').value,
+                twitter: document.getElementById('colorTwitter').value,
+                success: document.getElementById('colorSuccess').value,
+                text: document.getElementById('colorText').value
+            };
+            localStorage.setItem('colorScheme', JSON.stringify(scheme));
+            alert('✅ Color scheme saved!');
+        }
+
+        function resetColorScheme() {
+            localStorage.removeItem('colorScheme');
+            document.getElementById('colorBg').value = '#0f1419';
+            document.getElementById('colorAccent').value = '#ffd700';
+            document.getElementById('colorCrisis').value = '#ff0000';
+            document.getElementById('colorTwitter').value = '#1da1f2';
+            document.getElementById('colorSuccess').value = '#00ff00';
+            document.getElementById('colorText').value = '#ffffff';
+            alert('✅ Reset to default colors!');
+        }
+
+        function exportAllData() {
+            const dataStr = JSON.stringify(analytics, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `president-analytics-${Date.now()}.json`;
+            a.click();
+        }
+
+        function exportCSV() {
+            let csv = 'SessionID,StartTime,Duration,Score,Chaos,Events\n';
+            analytics.sessions.forEach(s => {
+                csv += `${s.sessionId},${new Date(s.startTime).toISOString()},${s.duration},${s.finalState?.score || 'N/A'},${s.finalState?.chaos || 'N/A'},${s.events.length}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `president-analytics-${Date.now()}.csv`;
+            a.click();
+        }
+
+        function exportLogs() {
+            const sessions = analytics.sessions || [];
+            const allEvents = [];
+            
+            sessions.forEach(s => {
+                s.events.forEach(e => {
+                    allEvents.push({ ...e, sessionId: s.sessionId });
+                });
+            });
+            
+            const dataStr = JSON.stringify(allEvents, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `president-logs-${Date.now()}.json`;
+            a.click();
+        }
+
+        // Auto-refresh every 10 seconds
+        setInterval(loadAnalytics, 10000);
+
+        // Initial load
+        loadAnalytics();
+    </script>
+</body>
+</html>

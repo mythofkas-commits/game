@@ -137,27 +137,149 @@ class PresidentGame {
         this.newsInterval = null;
         this.lastNewsFetch = 0;
         this.pendingCascades = [];
+        this.respondingToCrisis = false; // Track if responding to crisis via tweet
+        
+        // Analytics tracking
+        this.sessionId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        this.sessionStart = Date.now();
+        this.analytics = {
+            events: [],
+            decisions: [],
+            tweets: [],
+            powerChanges: [],
+            crises: []
+        };
+    }
+
+    // ============= ANALYTICS TRACKING =============
+
+    trackEvent(eventType, data = {}) {
+        const event = {
+            type: eventType,
+            timestamp: Date.now(),
+            sessionId: this.sessionId,
+            gameState: {
+                day: this.day,
+                energy: this.energy,
+                chaos: this.chaos,
+                score: this.score
+            },
+            ...data
+        };
+
+        this.analytics.events.push(event);
+        
+        // Save to localStorage for admin dashboard
+        this.saveAnalytics();
+        
+        console.log(`📊 Event tracked: ${eventType}`, data);
+    }
+
+    saveAnalytics() {
+        try {
+            // Get existing analytics
+            const existing = JSON.parse(localStorage.getItem('presidentAnalytics') || '{"sessions": []}');
+            
+            // Find or create current session
+            let session = existing.sessions.find(s => s.sessionId === this.sessionId);
+            if (!session) {
+                session = {
+                    sessionId: this.sessionId,
+                    startTime: this.sessionStart,
+                    events: [],
+                    finalState: null
+                };
+                existing.sessions.push(session);
+            }
+            
+            // Update session
+            session.events = this.analytics.events;
+            session.lastUpdate = Date.now();
+            session.duration = Date.now() - this.sessionStart;
+            session.finalState = {
+                day: this.day,
+                energy: this.energy,
+                chaos: this.chaos,
+                score: this.score,
+                powerCenters: this.powerCenters.map(p => ({ id: p.id, value: p.value }))
+            };
+            
+            // Keep only last 50 sessions
+            if (existing.sessions.length > 50) {
+                existing.sessions = existing.sessions.slice(-50);
+            }
+            
+            localStorage.setItem('presidentAnalytics', JSON.stringify(existing));
+        } catch (e) {
+            console.warn('Failed to save analytics:', e);
+        }
     }
 
     async init() {
+        // Show loading screen
+        this.showLoadingScreen();
+        
         this.updateDisplay();
         this.displayPowerCenters();
         this.displayRelationships();
-        
-        // Show mock news immediately
-        this.loadMockNews();
-        
-        // Then fetch real news
-        setTimeout(() => this.fetchRealPoliticalNews(), 2000);
-        
         this.setupReporters();
         this.setupTwitterInput();
         
-        // Generate initial crisis
-        setTimeout(() => this.generateContextualCrisis(), 1000);
+        // Wait for REAL news to load (no mock news)
+        await this.fetchRealPoliticalNews();
+        
+        // If we have news, hide loading and start game
+        if (this.currentNewsStories.length > 0) {
+            this.hideLoadingScreen();
+            setTimeout(() => this.generateContextualCrisis(), 500);
+        } else {
+            // If news failed, show error
+            this.showLoadingError();
+        }
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
-        this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000); // Every 10 min
+        this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000);
+        
+        // Track game start for analytics
+        this.trackEvent('game_started');
+    }
+
+    showLoadingError() {
+        const loading = document.getElementById('loadingScreen');
+        if (loading) {
+            loading.innerHTML = `
+                <div class="loading-content">
+                    <h2 style="color: #ff0000; margin: 20px 0;">⚠️ Failed to Load News</h2>
+                    <p style="color: #ddd;">Unable to fetch political news. Please check your connection.</p>
+                    <button class="start-presidency-btn" onclick="location.reload()" style="margin-top: 20px;">
+                        Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    showLoadingScreen() {
+        const loading = document.createElement('div');
+        loading.id = 'loadingScreen';
+        loading.className = 'loading-screen';
+        loading.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h2 style="color: #ffd700; margin: 20px 0;">Loading Your Presidency</h2>
+                <p style="color: #ddd;">Fetching real-time political news from around the world...</p>
+                <p style="color: #aaa; font-size: 14px; margin-top: 10px;">Initializing power centers and crisis systems</p>
+            </div>
+        `;
+        document.body.appendChild(loading);
+    }
+
+    hideLoadingScreen() {
+        const loading = document.getElementById('loadingScreen');
+        if (loading) {
+            loading.style.opacity = '0';
+            setTimeout(() => loading.remove(), 500);
+        }
     }
 
     setupTwitterInput() {
@@ -316,6 +438,15 @@ class PresidentGame {
         // Analyze the tweet
         const analysis = this.analyzeTweet(content);
 
+        // Track tweet
+        this.trackEvent('tweet_sent', {
+            content,
+            tone: analysis.tone,
+            chaos: analysis.chaos,
+            targets: analysis.targets,
+            warnings: analysis.warnings
+        });
+
         this.history.tweets.push({
             content,
             analysis,
@@ -339,6 +470,25 @@ class PresidentGame {
         // Show detailed feedback
         this.showTweetFeedback(analysis);
         this.updateDisplay();
+
+        // If responding to crisis or breaking news, dismiss it
+        if (this.respondingToCrisis) {
+            this.respondingToCrisis = false;
+            
+            // Dismiss breaking news modal if present
+            const modal = document.querySelector('.breaking-news-modal');
+            if (modal) modal.remove();
+            
+            // Generate next crisis
+            setTimeout(() => {
+                if (this.currentNewsStories.length > 0) {
+                    const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
+                    this.generateAdaptiveCrisis(randomNews);
+                } else {
+                    this.generateContextualCrisis();
+                }
+            }, 2000);
+        }
     }
 
     analyzeTweet(tweet) {
@@ -511,6 +661,7 @@ class PresidentGame {
     }
 
     focusTwitter() {
+        this.respondingToCrisis = true; // Mark that we're responding via tweet
         const input = document.getElementById('tweetInput');
         input.focus();
         input.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -547,19 +698,21 @@ class PresidentGame {
                 timestamp: new Date(article.publishedAt).getTime()
             }));
 
-            // DON'T FILTER - SHOW ALL
-            this.currentNewsStories = newsStories;
-            this.cacheNews(newsStories);
+            // Merge with existing stories and deduplicate
+            const allStories = [...this.currentNewsStories, ...newsStories];
+            this.currentNewsStories = this.deduplicateNews(allStories);
+            
+            this.cacheNews(this.currentNewsStories);
             this.displayNewsTicker();
             this.lastNewsFetch = Date.now();
 
             // Trigger breaking news for high relevance
-            const breakingNews = newsStories.filter(s => s.relevance > 0.75);
+            const breakingNews = this.currentNewsStories.filter(s => s.relevance > 0.75);
             if (breakingNews.length > 0 && Math.random() < 0.4) {
                 setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
-            console.log('✅ Fetched', newsStories.length, 'real news stories');
+            console.log('✅ Fetched', newsStories.length, 'new stories from NewsAPI');
             
         } catch (error) {
             console.error('News fetch failed:', error);
@@ -587,8 +740,11 @@ class PresidentGame {
                 timestamp: item.pubDate ? new Date(item.pubDate).getTime() : Date.now()
             }));
 
-            this.currentNewsStories = newsStories;
-            this.cacheNews(newsStories);
+            // Merge with existing and deduplicate
+            const allStories = [...this.currentNewsStories, ...newsStories];
+            this.currentNewsStories = this.deduplicateNews(allStories);
+            
+            this.cacheNews(this.currentNewsStories);
             this.displayNewsTicker();
             
             console.log('✅ Fetched RSS news');
@@ -620,14 +776,75 @@ class PresidentGame {
 
     categorizeNews(title, description) {
         const text = (title + ' ' + (description || '')).toLowerCase();
+        const categories = [];
+        let primaryCategory = 'domestic';
+        let maxScore = 0;
 
-        if (text.match(/china|russia|ukraine|nato|foreign|diplomat|putin|xi/)) return 'foreign';
-        if (text.match(/scandal|investigation|corruption|resign|indict/)) return 'scandal';
-        if (text.match(/market|economy|inflation|fed|unemployment|stock|trade/)) return 'economy';
-        if (text.match(/military|pentagon|defense|war|troops/)) return 'military';
-        if (text.match(/healthcare|medicare|drug|pharma|hospital/)) return 'healthcare';
+        // Define category patterns with weighted scoring
+        const patterns = {
+            foreign: {
+                keywords: ['china', 'russia', 'ukraine', 'nato', 'foreign', 'diplomat', 'putin', 'xi', 'taiwan', 'iran', 'north korea', 'israel', 'palestine', 'embassy', 'ambassador', 'treaty', 'alliance', 'invasion', 'sovereignty'],
+                weight: 2
+            },
+            military: {
+                keywords: ['military', 'pentagon', 'defense', 'war', 'troops', 'army', 'navy', 'air force', 'marines', 'soldier', 'combat', 'missile', 'weapon', 'aircraft', 'deployment', 'operation'],
+                weight: 2
+            },
+            economy: {
+                keywords: ['market', 'economy', 'inflation', 'fed', 'unemployment', 'stock', 'trade', 'tariff', 'gdp', 'recession', 'growth', 'interest rate', 'dollar', 'jobs', 'fiscal', 'monetary', 'wall street', 'dow', 'nasdaq'],
+                weight: 1.5
+            },
+            scandal: {
+                keywords: ['scandal', 'investigation', 'corruption', 'resign', 'indict', 'probe', 'allegation', 'impeach', 'fraud', 'bribery', 'misconduct', 'ethics', 'lawsuit', 'charges'],
+                weight: 2
+            },
+            healthcare: {
+                keywords: ['healthcare', 'medicare', 'medicaid', 'drug', 'pharma', 'hospital', 'insurance', 'obamacare', 'affordable care', 'prescription', 'medical', 'doctor', 'patient'],
+                weight: 1.5
+            },
+            climate: {
+                keywords: ['climate', 'environment', 'carbon', 'emissions', 'renewable', 'fossil fuel', 'epa', 'pollution', 'global warming', 'green energy', 'solar', 'wind'],
+                weight: 1.5
+            },
+            immigration: {
+                keywords: ['immigration', 'border', 'refugee', 'asylum', 'migrant', 'deportation', 'visa', 'citizenship', 'daca', 'ice'],
+                weight: 1.5
+            },
+            technology: {
+                keywords: ['tech', 'technology', 'cyber', 'ai', 'artificial intelligence', 'data', 'privacy', 'security', 'hack', 'silicon valley', 'social media', 'facebook', 'google', 'amazon', 'apple'],
+                weight: 1
+            }
+        };
+
+        // Calculate scores for each category
+        for (const [category, data] of Object.entries(patterns)) {
+            let score = 0;
+            for (const keyword of data.keywords) {
+                if (text.includes(keyword)) {
+                    score += data.weight;
+                }
+            }
+            
+            if (score > 0) {
+                categories.push({ category, score });
+            }
+            
+            if (score > maxScore) {
+                maxScore = score;
+                primaryCategory = category;
+            }
+        }
+
+        // If no strong match, check for general domestic indicators
+        if (maxScore < 2) {
+            if (text.match(/congress|senate|house|legislation|bill|vote|law/)) {
+                primaryCategory = 'domestic';
+            }
+        }
+
+        console.log(`📊 Categorized: "${title.substring(0, 50)}..." as ${primaryCategory} (score: ${maxScore.toFixed(1)})`);
         
-        return 'domestic';
+        return primaryCategory;
     }
 
     identifyAffectedCenters(title, description) {
@@ -650,7 +867,10 @@ class PresidentGame {
         const ticker = document.getElementById('newsTickerContent');
         ticker.innerHTML = '';
 
-        this.currentNewsStories.forEach(story => {
+        // Deduplicate before displaying
+        const uniqueStories = this.deduplicateNews(this.currentNewsStories);
+
+        uniqueStories.forEach(story => {
             const item = document.createElement('span');
             item.className = 'news-item';
             
@@ -662,6 +882,110 @@ class PresidentGame {
             item.onclick = () => this.respondToNews(story);
             ticker.appendChild(item);
         });
+
+        console.log(`📰 Showing ${uniqueStories.length} unique stories (filtered from ${this.currentNewsStories.length})`);
+    }
+
+    // ============= INTELLIGENT NEWS DEDUPLICATION =============
+
+    deduplicateNews(stories) {
+        if (stories.length === 0) return stories;
+
+        const TWO_HOURS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+        const SIMILARITY_THRESHOLD = 0.6; // 60% overlap = duplicate
+
+        // Sort by timestamp (newest first) and relevance
+        const sorted = [...stories].sort((a, b) => {
+            if (Math.abs(a.timestamp - b.timestamp) < 60000) {
+                return b.relevance - a.relevance; // If same time, prefer higher relevance
+            }
+            return b.timestamp - a.timestamp;
+        });
+
+        const unique = [];
+        const seen = new Set();
+
+        for (const story of sorted) {
+            let isDuplicate = false;
+
+            // Only compare with stories in the same time window
+            for (const existingStory of unique) {
+                const timeDiff = Math.abs(story.timestamp - existingStory.timestamp);
+                
+                if (timeDiff <= TWO_HOURS) {
+                    const similarity = this.calculateHeadlineSimilarity(
+                        story.headline, 
+                        existingStory.headline
+                    );
+
+                    if (similarity >= SIMILARITY_THRESHOLD) {
+                        isDuplicate = true;
+                        console.log(`🔄 Duplicate found: "${story.headline}" ≈ "${existingStory.headline}" (${Math.round(similarity * 100)}% similar)`);
+                        break;
+                    }
+                }
+            }
+
+            if (!isDuplicate) {
+                unique.push(story);
+                seen.add(story.headline);
+            }
+        }
+
+        return unique;
+    }
+
+    calculateHeadlineSimilarity(headline1, headline2) {
+        // Extract significant words (entities and actions)
+        const words1 = this.extractSignificantWords(headline1);
+        const words2 = this.extractSignificantWords(headline2);
+
+        if (words1.length === 0 || words2.length === 0) return 0;
+
+        // Calculate overlap
+        const set1 = new Set(words1);
+        const set2 = new Set(words2);
+        
+        let overlap = 0;
+        set1.forEach(word => {
+            if (set2.has(word)) overlap++;
+        });
+
+        // Calculate similarity as percentage of overlap
+        const similarity = overlap / Math.max(set1.size, set2.size);
+
+        return similarity;
+    }
+
+    extractSignificantWords(headline) {
+        // Common stop words to ignore
+        const stopWords = new Set([
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be',
+            'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+            'would', 'could', 'should', 'may', 'might', 'can', 'about', 'over',
+            'after', 'before', 'during', 'between', 'through', 'into', 'out'
+        ]);
+
+        // Important entities and action words
+        const importantWords = new Set([
+            'china', 'russia', 'taiwan', 'ukraine', 'iran', 'israel', 'north korea',
+            'biden', 'trump', 'putin', 'xi', 'congress', 'senate', 'house',
+            'threatens', 'warns', 'announces', 'proposes', 'condemns', 'attacks',
+            'invades', 'sanctions', 'imposes', 'passes', 'rejects', 'approves',
+            'military', 'economic', 'trade', 'war', 'deal', 'agreement', 'crisis',
+            'scandal', 'investigation', 'impeachment', 'election', 'vote'
+        ]);
+
+        const words = headline.toLowerCase()
+            .replace(/[^\w\s]/g, '') // Remove punctuation
+            .split(/\s+/)
+            .filter(word => {
+                // Keep if: not a stop word AND (length > 4 OR in important words)
+                return !stopWords.has(word) && (word.length > 4 || importantWords.has(word));
+            });
+
+        return words;
     }
 
     respondToNews(story) {
@@ -687,6 +1011,14 @@ class PresidentGame {
 
         this.currentCrisis = crisis;
         this.displayCrisis();
+        
+        // Track crisis
+        this.trackEvent('crisis_generated', {
+            headline: story.headline,
+            category: story.category,
+            affectedCenters: affectedCenters,
+            source: story.source
+        });
     }
 
     guessAffectedCenters(category) {
@@ -712,15 +1044,20 @@ class PresidentGame {
 
     generateAdaptiveOptions(story, affectedCenters) {
         const options = [];
-        const category = story.category;
-        const headline = story.headline.toLowerCase();
+        const category = story.category || 'domestic';
+        const headline = (story.headline || '').toLowerCase();
+
+        console.log(`🎮 Generating options for: "${story.headline}" (Category: ${category})`);
 
         // Option 1: Context-specific aggressive response
         if (category === 'foreign') {
+            const aggressiveText = headline.includes('china') ? '🚢 Deploy Naval Forces' : 
+                                   headline.includes('russia') ? '🎯 Increase Sanctions' :
+                                   headline.includes('iran') ? '⚔️ Military Threat' :
+                                   '💪 Show Military Strength';
+            
             options.push({
-                text: headline.includes('china') ? '🚢 Deploy Naval Forces' : 
-                      headline.includes('russia') ? '🎯 Increase Sanctions' :
-                      '💪 Show Military Strength',
+                text: aggressiveText,
                 effects: affectedCenters.map(id => {
                     if (id === 'military') return { center: id, change: 15 };
                     if (id === 'wallstreet') return { center: id, change: -15 };
@@ -731,10 +1068,13 @@ class PresidentGame {
                 energy: 25
             });
         } else if (category === 'economy') {
+            const economicText = headline.includes('inflation') ? '🏦 Emergency Fed Meeting' :
+                                headline.includes('market') ? '💵 Stimulus Package' :
+                                headline.includes('unemploy') ? '💼 Jobs Program' :
+                                '📊 Economic Intervention';
+            
             options.push({
-                text: headline.includes('inflation') ? '🏦 Emergency Fed Meeting' :
-                      headline.includes('market') ? '💵 Stimulus Package' :
-                      '📊 Economic Intervention',
+                text: economicText,
                 effects: affectedCenters.map(id => {
                     if (id === 'wallstreet') return { center: id, change: 15 };
                     if (id === 'industry') return { center: id, change: 10 };
@@ -755,6 +1095,18 @@ class PresidentGame {
                 }),
                 chaos: 25,
                 energy: 15
+            });
+        } else if (category === 'military') {
+            options.push({
+                text: '🎖️ Mobilize Forces',
+                effects: affectedCenters.map(id => {
+                    if (id === 'military') return { center: id, change: 20 };
+                    if (id === 'congress') return { center: id, change: -10 };
+                    if (id === 'public') return { center: id, change: 12 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 25,
+                energy: 25
             });
         } else {
             options.push({
@@ -846,6 +1198,17 @@ class PresidentGame {
                 chaos: 30,
                 energy: 25
             });
+        } else if (category === 'foreign') {
+            options.push({
+                text: '🌍 Call Allied Summit',
+                effects: affectedCenters.map(id => {
+                    if (id === 'intelligence') return { center: id, change: 15 };
+                    if (id === 'congress') return { center: id, change: 10 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 8,
+                energy: 20
+            });
         } else {
             options.push({
                 text: '🔥 Attack Opponents',
@@ -860,6 +1223,7 @@ class PresidentGame {
             });
         }
 
+        console.log(`✅ Generated ${options.length} context-specific options`);
         return options;
     }
 
@@ -900,6 +1264,15 @@ class PresidentGame {
     }
 
     handleDecision(option) {
+        // Track decision
+        this.trackEvent('decision_made', {
+            crisis: this.currentCrisis.title,
+            option: option.text,
+            category: this.currentCrisis.newsStory?.category,
+            chaos: option.chaos,
+            energy: option.energy
+        });
+
         // Special actions
         if (option.action === 'focusTwitter') {
             this.focusTwitter();
@@ -1144,7 +1517,51 @@ class PresidentGame {
     }
 
     initiatePhoneCall(caller) {
-        this.showNotification(`📞 ${caller.name} is calling...`);
+        if (caller.lastInteraction && Date.now() - caller.lastInteraction < 30000) {
+            this.showNotification(`${caller.name} is busy right now`);
+            return;
+        }
+
+        this.currentCaller = caller;
+        caller.lastInteraction = Date.now();
+
+        const demand = `Regarding ${caller.currentIssues[0]}: We need to discuss this matter urgently.`;
+        
+        this.history.phoneCalls.push({
+            caller: caller.name,
+            demand,
+            timestamp: Date.now()
+        });
+
+        // Quick negotiation
+        const roll = Math.random() * 100;
+        const successChance = caller.trust;
+
+        if (roll < successChance) {
+            // Success
+            this.score += 50;
+            this.chaos = Math.max(0, this.chaos - 10);
+            this.updateRelationshipValues(caller.name, 10, 5, 0);
+            this.showNotification(`✅ Successful negotiation with ${caller.name}!`);
+        } else {
+            // Failure
+            this.chaos += 10;
+            this.updateRelationshipValues(caller.name, -10, -5, 10);
+            this.showNotification(`❌ ${caller.name} rejects your proposal!`);
+        }
+
+        this.energy -= 10;
+        this.updateDisplay();
+        this.displayRelationships();
+    }
+
+    updateRelationshipValues(name, trustChange, respectChange, fearChange) {
+        const rel = this.relationships.find(r => r.name === name);
+        if (!rel) return;
+
+        rel.trust = Math.max(0, Math.min(100, rel.trust + trustChange));
+        rel.respect = Math.max(0, Math.min(100, rel.respect + respectChange));
+        rel.fear = Math.max(0, Math.min(100, rel.fear + fearChange));
     }
 
     startPressConference() {
