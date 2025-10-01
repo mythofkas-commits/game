@@ -22,72 +22,78 @@
     <!-- MAIN GAME -->
     <div class="game-container" id="gameContainer">
         <div class="status-bar">
-            <div>Day: <span id="day">1</span></div>
-            <div>Energy: <span id="energy">100</span></div>
-            <div>Chaos: <span id="chaos">0</span></div>
-            <div>Score: <span id="score">0</span></div>
+            <div>📅 Day: <span id="day">1</span></div>
+            <div>⚡ Energy: <span id="energy">100</span></div>
+            <div>🌪️ Chaos: <span id="chaos">0</span></div>
+            <div>🏆 Score: <span id="score">0</span></div>
         </div>
 
         <!-- REAL-TIME NEWS TICKER -->
         <div class="news-ticker" id="newsTicker">
-            <div class="news-ticker-content" id="newsTickerContent" role="list" aria-live="polite">
-                <span class="news-item" role="listitem" tabindex="0">Loading real political news...</span>
+            <div class="news-ticker-content" id="newsTickerContent">
+                <span class="news-item">📡 Loading real political news...</span>
             </div>
         </div>
 
+        <!-- POWER CENTERS - THE CORE SYSTEM -->
+        <div class="power-centers-panel">
+            <h3 style="color: #ffd700; margin-bottom: 10px;">🎯 POWER CENTERS</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">
+                Your decisions affect these power centers. Watch for cascading effects!
+            </p>
+            <div class="power-centers-grid" id="powerCentersGrid"></div>
+            <div class="coalition-status" id="coalitionStatus">
+                📊 Political Balance Maintained
+            </div>
+        </div>
+
+        <!-- TWEET STORM SYSTEM -->
         <div class="tweet-panel">
-            <h3 style="color: #fff; margin-bottom: 15px;">TWEET STORM SYSTEM</h3>
-            <input type="text" class="tweet-input" id="tweetInput" placeholder="What's on your mind, Mr. President?" maxlength="280">
+            <h3 style="color: #fff; margin-bottom: 15px;">🐦 TWEET STORM SYSTEM</h3>
+            <input type="text" class="tweet-input" id="tweetInput" 
+                   placeholder="What's on your mind, Mr. President?" maxlength="280">
             <button class="tweet-btn" onclick="game.sendTweet()">SEND TWEET</button>
         </div>
 
-        <div class="relationships-panel">
-            <h3 style="color: #ffd700; margin-bottom: 10px;">KEY RELATIONSHIPS</h3>
-            <div class="relationships-grid" id="relationshipsGrid"></div>
+        <!-- CRISIS PANEL -->
+        <div class="crisis-panel" id="crisisPanel">
+            <h2 id="crisisTitle" style="color: #ff0000; margin-bottom: 10px;">Crisis Loading...</h2>
+            <div id="affectedCenters"></div>
+            <p id="crisisDescription" style="color: #ddd; margin: 15px 0;">Preparing situation...</p>
+            <div id="crisisOptions"></div>
+            <button class="decision-btn" style="background: #1da1f2; color: #fff; margin-top: 15px;" 
+                    onclick="game.startPressConference()">
+                📺 Hold Press Conference
+            </button>
         </div>
 
-        <div class="crisis-panel" id="crisisPanel">
-            <h2 id="crisisTitle">Crisis Loading...</h2>
-            <p id="crisisDescription">Preparing situation...</p>
-            <div id="crisisOptions"></div>
-            <button class="decision-btn" style="background: #1da1f2; color: #fff; margin-top: 15px;" onclick="game.startPressConference()">Hold Press Conference</button>
+        <!-- KEY RELATIONSHIPS -->
+        <div class="relationships-panel">
+            <h3 style="color: #ffd700; margin-bottom: 10px;">📞 KEY RELATIONSHIPS</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">
+                Click to negotiate. Low trust = potential betrayal.
+            </p>
+            <div class="relationships-grid" id="relationshipsGrid"></div>
         </div>
     </div>
 
     <!-- PRESS CONFERENCE -->
     <div class="press-conference" id="pressConference">
-        <button class="close-btn" onclick="game.endPressConference()">End Conference</button>
-        <h3 style="color: #ffd700; margin-bottom: 15px;">PRESS CONFERENCE</h3>
+        <button class="close-btn" onclick="game.endPressConference()">X</button>
+        <h3 style="color: #ffd700; margin-bottom: 15px;">📺 PRESS CONFERENCE</h3>
         <div id="currentQuestion" style="color: #fff; margin-bottom: 15px; font-style: italic;"></div>
         <div class="reporters-row" id="reportersRow"></div>
         <div class="response-options">
-            <button class="response-btn" onclick="game.pressResponse('attack')">ATTACK</button>
-            <button class="response-btn" onclick="game.pressResponse('deflect')">DEFLECT</button>
-            <button class="response-btn" onclick="game.pressResponse('answer')">ANSWER</button>
-            <button class="response-btn" onclick="game.pressResponse('joke')">JOKE</button>
+            <button class="response-btn" onclick="game.pressResponse('attack')">⚔️ ATTACK</button>
+            <button class="response-btn" onclick="game.pressResponse('deflect')">🛡️ DEFLECT</button>
+            <button class="response-btn" onclick="game.pressResponse('answer')">💬 ANSWER</button>
+            <button class="response-btn" onclick="game.pressResponse('joke')">😂 JOKE</button>
         </div>
     </div>
 
-    <!-- SCANDAL CONTROL -->
-    <div class="scandal-control" id="scandalControl">
-        <button class="close-btn" onclick="game.closeScandal()">X</button>
-        <h2 style="color: #ff0000; margin-bottom: 10px;">SCANDAL SPREADING!</h2>
-        <p style="color: #fff; margin-bottom: 10px;">Click infected nodes to contain the scandal!</p>
-        <div class="scandal-grid" id="scandalGrid"></div>
-        <div class="damage-control" id="damageControl"></div>
-    </div>
+    <!-- POWER NOTIFICATIONS CONTAINER -->
+    <div class="power-notifications-container" id="powerNotifications"></div>
 
-    <!-- PHONE INTERFACE -->
-    <div class="phone-interface" id="phoneInterface">
-        <div class="caller-name" id="callerName">Unknown Caller</div>
-        <div class="negotiation-info" id="negotiationInfo"></div>
-        <div class="leverage-cards" id="leverageCards"></div>
-        <button class="decision-btn" style="width: 100%;" onclick="game.endCall()">End Call</button>
-    </div>
-
-    <!-- OVERLAY -->
-    <div class="overlay" id="overlay"></div>
-
-    <script src="assets/game.js" defer></script>
+    <script src="assets/game.js"></script>
 </body>
 </html>

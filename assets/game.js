@@ -1,6 +1,7 @@
 /*
 =============================================================================
 PRESIDENT SIMULATOR - TOTAL CHAOS EDITION
+Influence Network System
 =============================================================================
 */
 
@@ -23,9 +24,21 @@ class PresidentGame {
         this.chaos = 0;
         this.score = 0;
 
+        // POWER CENTERS - The Core System
+        this.powerCenters = [
+            { id: 'congress', name: 'Congress', icon: '🏛️', value: 50, color: '#4169E1' },
+            { id: 'military', name: 'Military', icon: '🎖️', value: 60, color: '#556B2F' },
+            { id: 'intelligence', name: 'Intelligence', icon: '🕵️', value: 50, color: '#2F4F4F' },
+            { id: 'wallstreet', name: 'Wall Street', icon: '💰', value: 55, color: '#FFD700' },
+            { id: 'media', name: 'Media', icon: '📺', value: 40, color: '#FF4500' },
+            { id: 'public', name: 'Public Opinion', icon: '👥', value: 50, color: '#32CD32' },
+            { id: 'industry', name: 'Industry', icon: '🏭', value: 55, color: '#708090' },
+            { id: 'science', name: 'Scientific Community', icon: '🎓', value: 45, color: '#9370DB' }
+        ];
+
         this.currentNewsStories = [];
+        this.newsCache = this.loadNewsCache() || [];
         this.processedNewsEvents = [];
-        this.newsRelevanceThreshold = 0.5;
 
         this.history = {
             tweets: [],
@@ -33,15 +46,8 @@ class PresidentGame {
             phoneCalls: [],
             pressConferences: [],
             scandals: [],
-            newsResponses: []
-        };
-
-        this.currentContext = {
-            recentEvents: [],
-            activeNarratives: [],
-            publicMood: 'neutral',
-            economicState: 'stable',
-            internationalTension: 'low'
+            newsResponses: [],
+            powerChanges: []
         };
 
         this.relationships = [
@@ -99,26 +105,8 @@ class PresidentGame {
                 lastInteraction: null,
                 history: [],
                 currentIssues: ['trade', 'taiwan', 'technology']
-            },
-            {
-                name: 'Boris Johnson',
-                trust: 70,
-                respect: 45,
-                fear: 5,
-                role: 'UK PM',
-                personality: 'chaotic',
-                lastInteraction: null,
-                history: [],
-                currentIssues: ['brexit', 'trade', 'nato']
             }
         ];
-
-        this.crisisTemplates = {
-            domestic: ['budget', 'scandal', 'protest', 'shooting', 'natural disaster'],
-            international: ['trade war', 'military conflict', 'diplomatic incident', 'terrorism'],
-            economic: ['market crash', 'unemployment', 'inflation', 'bank failure'],
-            political: ['impeachment', 'election', 'supreme court', 'congress revolt']
-        };
 
         this.reporters = [
             { name: 'Jim Acosta', outlet: 'CNN', mood: 'hostile', trust: 20, specialty: 'scandal' },
@@ -128,147 +116,264 @@ class PresidentGame {
         ];
 
         this.currentReporter = null;
-        this.currentQuestion = '';
         this.currentCrisis = null;
         this.scandalActive = false;
         this.scandalInterval = null;
         this.currentCaller = null;
         this.gameInterval = null;
         this.newsInterval = null;
+        this.lastNewsFetch = 0;
+        this.pendingCascades = [];
     }
 
     async init() {
         this.updateDisplay();
+        this.displayPowerCenters();
         this.displayRelationships();
         await this.loadInitialNews();
         this.setupReporters();
+        
+        // Generate initial crisis
+        this.generateContextualCrisis();
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
-        this.newsInterval = setInterval(() => this.fetchRealPoliticalNews(), 120000); // Every 2 minutes
+        this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000); // Every 10 min
     }
+
+    // ============= POWER CENTER SYSTEM =============
+    
+    displayPowerCenters() {
+        const container = document.getElementById('powerCentersGrid');
+        container.innerHTML = '';
+
+        this.powerCenters.forEach(center => {
+            const card = document.createElement('div');
+            card.className = 'power-center-card';
+            card.innerHTML = `
+                <div class="power-center-header">
+                    <span class="power-icon">${center.icon}</span>
+                    <span class="power-name">${center.name}</span>
+                </div>
+                <div class="power-meter">
+                    <div class="power-meter-fill" id="power-${center.id}" 
+                         style="width: ${center.value}%; background: ${center.color}"></div>
+                </div>
+                <div class="power-value">${center.value}%</div>
+            `;
+            container.appendChild(card);
+        });
+
+        this.checkCoalitions();
+    }
+
+    updatePowerCenter(id, change, reason = '') {
+        const center = this.powerCenters.find(p => p.id === id);
+        if (!center) return;
+
+        const oldValue = center.value;
+        center.value = Math.max(0, Math.min(100, center.value + change));
+        
+        // Animate the change
+        const fillEl = document.getElementById(`power-${id}`);
+        if (fillEl) {
+            fillEl.style.width = `${center.value}%`;
+            
+            // Flash effect
+            const card = fillEl.closest('.power-center-card');
+            card.classList.add(change > 0 ? 'power-increase' : 'power-decrease');
+            setTimeout(() => {
+                card.classList.remove('power-increase', 'power-decrease');
+            }, 500);
+        }
+
+        // Show change notification
+        if (Math.abs(change) >= 5) {
+            this.showPowerChangeNotification(center, change, reason);
+        }
+
+        // Record in history
+        this.history.powerChanges.push({
+            center: id,
+            oldValue,
+            newValue: center.value,
+            change,
+            reason,
+            timestamp: Date.now()
+        });
+
+        // Check for cascades
+        this.triggerCascadeEffects(id, change);
+        this.checkCoalitions();
+    }
+
+    showPowerChangeNotification(center, change, reason) {
+        const notif = document.createElement('div');
+        notif.className = 'power-notification';
+        notif.innerHTML = `
+            ${center.icon} ${center.name}: ${change > 0 ? '+' : ''}${Math.round(change)}
+            ${reason ? `<div style="font-size: 11px; opacity: 0.8;">${reason}</div>` : ''}
+        `;
+        document.getElementById('powerNotifications').appendChild(notif);
+
+        setTimeout(() => notif.remove(), 3000);
+    }
+
+    triggerCascadeEffects(triggerId, change) {
+        // Define cascade rules
+        const cascades = {
+            wallstreet: [
+                { target: 'industry', factor: 0.3, condition: () => Math.abs(change) > 15 },
+                { target: 'public', factor: -0.2, condition: () => change < -10 }
+            ],
+            military: [
+                { target: 'intelligence', factor: 0.2, condition: () => Math.abs(change) > 10 }
+            ],
+            media: [
+                { target: 'public', factor: 0.4, condition: () => Math.abs(change) > 10 }
+            ],
+            congress: [
+                { target: 'public', factor: 0.15, condition: () => change < -15 }
+            ],
+            public: [
+                { target: 'congress', factor: 0.25, condition: () => Math.abs(change) > 20 }
+            ]
+        };
+
+        const rules = cascades[triggerId];
+        if (!rules) return;
+
+        rules.forEach(rule => {
+            if (rule.condition()) {
+                const cascadeChange = change * rule.factor;
+                setTimeout(() => {
+                    this.updatePowerCenter(rule.target, cascadeChange, 'Cascade effect');
+                }, 500);
+            }
+        });
+    }
+
+    checkCoalitions() {
+        const hostile = this.powerCenters.filter(p => p.value < 30);
+        const allies = this.powerCenters.filter(p => p.value > 70);
+
+        // Update coalition display
+        const coalitionEl = document.getElementById('coalitionStatus');
+        if (hostile.length >= 3) {
+            coalitionEl.innerHTML = `⚠️ <strong>Coalition Against You:</strong> ${hostile.map(h => h.icon).join(' ')}`;
+            coalitionEl.className = 'coalition-warning';
+        } else if (allies.length >= 3) {
+            coalitionEl.innerHTML = `✅ <strong>Strong Coalition:</strong> ${allies.map(a => a.icon).join(' ')}`;
+            coalitionEl.className = 'coalition-positive';
+        } else {
+            coalitionEl.innerHTML = '📊 Political Balance Maintained';
+            coalitionEl.className = '';
+        }
+    }
+
+    // ============= NEWS SYSTEM (SHOW ALL) =============
 
     async loadInitialNews() {
         const ticker = document.getElementById('newsTickerContent');
-        ticker.innerHTML = '<span class="news-item">Loading real political news...</span>';
+        ticker.innerHTML = '<span class="news-item">📡 Loading real political news...</span>';
         
         await this.fetchRealPoliticalNews();
     }
 
+    async checkForNewsUpdate() {
+        const timeSince = Date.now() - this.lastNewsFetch;
+        if (timeSince > 600000) { // 10 minutes
+            await this.fetchRealPoliticalNews();
+        }
+    }
+
     async fetchRealPoliticalNews() {
         try {
-            // Fetch from your own backend API endpoint to avoid CORS and protect the API key
             const response = await fetch(
-                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR "federal reserve" OR scandal OR impeachment OR election)&' +
-                'language=en&' +
-                'sortBy=publishedAt&' +
-                'pageSize=10'
+                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR scandal OR military OR healthcare)&' +
+                'language=en&sortBy=publishedAt&pageSize=15'
             );
 
-            if (!response.ok) {
-                throw new Error('NewsAPI failed, trying RSS backup');
-            }
+            if (!response.ok) throw new Error('NewsAPI failed');
 
             const data = await response.json();
             
-            if (!data.articles || data.articles.length === 0) {
-                throw new Error('No articles found');
-            }
+            if (!data.articles || data.articles.length === 0) throw new Error('No articles');
 
-            const newsStories = data.articles.map(article => {
-                return {
-                    headline: article.title,
-                    source: article.source.name,
-                    relevance: this.calculateRelevance(article.title, article.description),
-                    category: this.categorizeNews(article.title, article.description),
-                    actors: this.extractActors(article.title, article.description),
-                    timestamp: new Date(article.publishedAt).getTime()
-                };
-            });
+            const newsStories = data.articles.map(article => ({
+                headline: article.title,
+                source: article.source.name,
+                relevance: this.calculateRelevance(article.title, article.description),
+                category: this.categorizeNews(article.title, article.description),
+                affectedCenters: this.identifyAffectedCenters(article.title, article.description),
+                timestamp: new Date(article.publishedAt).getTime()
+            }));
 
-            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            // DON'T FILTER - SHOW ALL
+            this.currentNewsStories = newsStories;
+            this.cacheNews(newsStories);
             this.displayNewsTicker();
+            this.lastNewsFetch = Date.now();
 
-            const topStory = newsStories.find(s => s.relevance > 0.75);
-            if (topStory && !this.currentCrisis) {
-                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
+            // Trigger breaking news for high relevance
+            const breakingNews = newsStories.filter(s => s.relevance > 0.75);
+            if (breakingNews.length > 0 && Math.random() < 0.4) {
+                setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
-            console.log('✓ Fetched real news:', newsStories.length, 'stories from NewsAPI');
+            console.log('✅ Fetched', newsStories.length, 'real news stories');
             
         } catch (error) {
-            console.error('NewsAPI failed, trying RSS backup:', error);
+            console.error('News fetch failed:', error);
             await this.fetchRSSNews();
         }
     }
 
     async fetchRSSNews() {
         try {
-            // Map feed names to backend API endpoints
-            const feedEndpoints = [
-                { name: 'bbc', url: '/api/rss?feed=bbc' },
-                { name: 'nyt', url: '/api/rss?feed=nyt' }
-            ];
+            const feeds = ['bbc', 'nyt'];
+            const randomFeed = feeds[Math.floor(Math.random() * feeds.length)];
+            const response = await fetch(`/api/rss?feed=${randomFeed}`);
 
-            const randomFeed = feedEndpoints[Math.floor(Math.random() * feedEndpoints.length)];
-            
-            // Fetch the RSS feed from the backend API to avoid CORS issues.
-            const response = await fetch(randomFeed.url);
+            if (!response.ok) throw new Error('RSS failed');
 
-            if (!response.ok) {
-                throw new Error('RSS backup failed');
-            }
-
-            // Expect JSON response from backend: { feedTitle, items: [{ title, description, pubDate }] }
             const rssJson = await response.json();
-
-            let feedTitle = rssJson.feedTitle || "RSS Feed";
             const items = rssJson.items || [];
-            if (!items || items.length === 0) {
-                throw new Error('No RSS items found');
-            }
 
-            const newsStories = items.map(item => {
-                const title = item.title || "";
-                const description = item.description || "";
-                const pubDate = item.pubDate || "";
-                return {
-                    headline: title,
-                    source: feedTitle,
-                    relevance: this.calculateRelevance(title, description),
-                    category: this.categorizeNews(title, description),
-                    actors: this.extractActors(title, description),
-                    timestamp: pubDate ? new Date(pubDate).getTime() : Date.now()
-                };
-            });
+            const newsStories = items.map(item => ({
+                headline: item.title || "",
+                source: rssJson.feedTitle || "RSS Feed",
+                relevance: this.calculateRelevance(item.title, item.description),
+                category: this.categorizeNews(item.title, item.description),
+                affectedCenters: this.identifyAffectedCenters(item.title, item.description),
+                timestamp: item.pubDate ? new Date(item.pubDate).getTime() : Date.now()
+            }));
 
-            this.currentNewsStories = newsStories.filter(s => s.relevance >= this.newsRelevanceThreshold);
+            this.currentNewsStories = newsStories;
+            this.cacheNews(newsStories);
             this.displayNewsTicker();
-
-            const topStory = newsStories.find(s => s.relevance > 0.75);
-            if (topStory && !this.currentCrisis) {
-                setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
-            }
-
-            console.log('✓ Fetched RSS news:', newsStories.length, 'stories');
+            
+            console.log('✅ Fetched RSS news');
             
         } catch (error) {
-            console.error('All news sources failed, using mock news:', error);
-            this.loadMockNews();
+            console.error('RSS failed, using cache:', error);
+            this.loadCachedNews();
         }
     }
 
     calculateRelevance(title, description) {
         const text = (title + ' ' + (description || '')).toLowerCase();
-        let score = 0.5;
+        let score = 0.3;
 
-        const highKeywords = ['president', 'congress', 'senate', 'white house', 'impeach', 'scandal', 'crisis', 'trump', 'biden'];
+        const highKeywords = ['president', 'congress', 'senate', 'white house', 'impeach', 'scandal', 
+            'crisis', 'trump', 'biden', 'government', 'federal', 'washington', 'supreme court'];
         highKeywords.forEach(keyword => {
-            if (text.includes(keyword)) score += 0.1;
+            if (text.includes(keyword)) score += 0.15;
         });
 
-        const medKeywords = ['election', 'bill', 'vote', 'policy', 'federal', 'democrat', 'republican', 'nato', 'china', 'russia'];
+        const medKeywords = ['election', 'bill', 'policy', 'democrat', 'republican', 'nato', 
+            'china', 'russia', 'military', 'economy', 'inflation', 'trade'];
         medKeywords.forEach(keyword => {
-            if (text.includes(keyword)) score += 0.05;
+            if (text.includes(keyword)) score += 0.08;
         });
 
         return Math.min(1, score);
@@ -277,230 +382,29 @@ class PresidentGame {
     categorizeNews(title, description) {
         const text = (title + ' ' + (description || '')).toLowerCase();
 
-        if (text.match(/china|russia|ukraine|nato|foreign|international|diplomat|putin|xi/)) {
-            return 'foreign';
-        }
-        if (text.match(/scandal|investigation|corruption|resign|indict|probe|allegation/)) {
-            return 'scandal';
-        }
-        if (text.match(/market|economy|inflation|fed|unemployment|gdp|stock|trade|tariff/)) {
-            return 'economy';
-        }
+        if (text.match(/china|russia|ukraine|nato|foreign|diplomat|putin|xi/)) return 'foreign';
+        if (text.match(/scandal|investigation|corruption|resign|indict/)) return 'scandal';
+        if (text.match(/market|economy|inflation|fed|unemployment|stock|trade/)) return 'economy';
+        if (text.match(/military|pentagon|defense|war|troops/)) return 'military';
+        if (text.match(/healthcare|medicare|drug|pharma|hospital/)) return 'healthcare';
+        
         return 'domestic';
     }
 
-    extractActors(title, description) {
+    identifyAffectedCenters(title, description) {
         const text = (title + ' ' + (description || '')).toLowerCase();
-        const actors = [];
+        const affected = [];
 
-        const figures = {
-            'biden': 'Joe Biden',
-            'trump': 'Donald Trump',
-            'harris': 'Kamala Harris',
-            'mcconnell': 'Mitch McConnell',
-            'schumer': 'Chuck Schumer',
-            'pelosi': 'Nancy Pelosi',
-            'putin': 'Vladimir Putin',
-            'xi jinping': 'Xi Jinping',
-            'xi': 'Xi Jinping',
-            'johnson': 'Boris Johnson',
-            'macron': 'Emmanuel Macron'
-        };
+        if (text.match(/congress|senate|house|legislat/)) affected.push('congress');
+        if (text.match(/military|pentagon|defense|troops/)) affected.push('military');
+        if (text.match(/cia|fbi|intelligence|spy/)) affected.push('intelligence');
+        if (text.match(/market|stock|wall street|dow|investor/)) affected.push('wallstreet');
+        if (text.match(/media|press|journalist|cnn|fox/)) affected.push('media');
+        if (text.match(/poll|voter|public|american/)) affected.push('public');
+        if (text.match(/business|ceo|industry|corporate/)) affected.push('industry');
+        if (text.match(/science|research|university|academic/)) affected.push('science');
 
-        Object.entries(figures).forEach(([search, proper]) => {
-            if (text.includes(search) && !actors.includes(proper)) {
-                actors.push(proper);
-            }
-        });
-
-        if (actors.length === 0) {
-            if (text.includes('congress')) actors.push('Congress');
-            if (text.includes('senate')) actors.push('Senate');
-            if (text.includes('house')) actors.push('House');
-        }
-
-        return actors;
-    }
-
-    loadMockNews() {
-        const mockNews = [
-            {
-                headline: 'Congress Debates Infrastructure Bill Worth $2 Trillion',
-                source: 'Reuters',
-                relevance: 0.9,
-                category: 'domestic',
-                actors: ['Congress', 'Chuck Schumer', 'Mitch McConnell'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'China Warns Against Taiwan Independence',
-                source: 'CNN',
-                relevance: 0.8,
-                category: 'foreign',
-                actors: ['Xi Jinping', 'Taiwan'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Fed Considers Interest Rate Hike Amid Inflation Concerns',
-                source: 'Bloomberg',
-                relevance: 0.7,
-                category: 'economy',
-                actors: ['Federal Reserve'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Putin Calls for New Security Talks with NATO',
-                source: 'BBC',
-                relevance: 0.85,
-                category: 'foreign',
-                actors: ['Vladimir Putin', 'NATO'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Supreme Court to Review Controversial Voting Rights Case',
-                source: 'NPR',
-                relevance: 0.75,
-                category: 'domestic',
-                actors: ['Supreme Court'],
-                timestamp: Date.now()
-            }
-        ];
-
-        this.currentNewsStories = mockNews;
-        this.displayNewsTicker();
-
-        const topStory = this.getTopRelevantNews();
-        if (topStory) {
-            setTimeout(() => this.generateNewsBasedCrisis(topStory), 3000);
-        }
-
-        console.log('✓ Using mock news (fallback)');
-    }
-
-    getTopRelevantNews() {
-        return this.currentNewsStories.sort((a, b) => b.relevance - a.relevance)[0];
-    }
-
-    triggerBreakingNews(story) {
-        const existing = document.querySelector('.breaking-news-alert');
-        if (existing) existing.remove();
-
-        const alert = document.createElement('div');
-        alert.className = 'breaking-news-alert active';
-        alert.innerHTML = `
-            <div class="news-source">BREAKING NEWS - ${story.source}</div>
-            <h2 style="color: #fff; margin-bottom: 20px;">${story.headline}</h2>
-            <p style="color: #ddd; margin-bottom: 20px;">This requires your immediate attention!</p>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                <button class="decision-btn" data-action="dismiss">Dismiss</button>
-                <button class="decision-btn" data-action="tweet">Tweet Response</button>
-                <button class="decision-btn" data-action="call">Emergency Call</button>
-                <button class="decision-btn" data-action="crisis">Crisis Mode</button>
-            </div>
-        `;
-
-        alert.querySelectorAll('.decision-btn[data-action]').forEach(button => {
-            const action = button.dataset.action;
-            button.addEventListener('click', () => this.quickNewsResponse(action, story));
-        });
-        document.body.appendChild(alert);
-
-        setTimeout(() => {
-            if (alert.parentNode) {
-                alert.remove();
-                this.chaos += 5;
-                this.showNotification('Ignored breaking news - chaos increases!');
-                this.updateDisplay();
-            }
-        }, 10000);
-    }
-
-    quickNewsResponse(action, story) {
-        const alert = document.querySelector('.breaking-news-alert');
-        if (alert) alert.remove();
-
-        if (!story) return;
-
-        this.history.newsResponses.push({
-            story,
-            action,
-            timestamp: Date.now()
-        });
-
-        switch (action) {
-            case 'dismiss':
-                this.chaos += 10;
-                this.showNotification('Media criticizes your silence!');
-                break;
-            case 'tweet':
-                document.getElementById('tweetInput').value = `Regarding ${story.headline.substring(0, 50)}...`;
-                document.getElementById('tweetInput').focus();
-                break;
-            case 'call':
-                this.callRelevantActor(story);
-                break;
-            case 'crisis':
-                this.generateNewsBasedCrisis(story);
-                break;
-        }
-
-        this.updateDisplay();
-    }
-
-    callRelevantActor(story) {
-        const relevantActor = this.relationships.find(r =>
-            story.actors.some(actor => r.name.includes(actor) || actor.includes(r.name.split(' ').pop()))
-        );
-
-        if (relevantActor) {
-            this.initiatePhoneCall(relevantActor);
-        } else {
-            this.showNotification('No direct contact available.');
-        }
-    }
-
-    generateDynamicNewsStory() {
-        const templates = [
-            {
-                headline: `${this.randomFrom(['Senate', 'House', 'Congress'])} ${this.randomFrom(['Blocks', 'Advances', 'Debates'])} ${this.randomFrom(['Healthcare', 'Immigration', 'Tax'])} Reform`,
-                category: 'domestic',
-                actors: ['Congress']
-            },
-            {
-                headline: `${this.randomFrom(['Russia', 'China', 'Iran'])} ${this.randomFrom(['Threatens', 'Proposes', 'Rejects'])} ${this.randomFrom(['Sanctions', 'Trade Deal', 'Military Action'])}`,
-                category: 'foreign',
-                actors: ['Vladimir Putin', 'Xi Jinping']
-            },
-            {
-                headline: `Stock Market ${this.randomFrom(['Surges', 'Plummets', 'Volatile'])} Amid ${this.randomFrom(['Tech', 'Banking', 'Energy'])} ${this.randomFrom(['Crisis', 'Boom', 'Uncertainty'])}`,
-                category: 'economy',
-                actors: ['Markets']
-            },
-            {
-                headline: `Breaking: ${this.randomFrom(['FBI', 'DOJ', 'Congress'])} Launches Investigation Into ${this.randomFrom(['Campaign Finance', 'Foreign Interference', 'Corporate Fraud'])}`,
-                category: 'scandal',
-                actors: ['DOJ']
-            }
-        ];
-
-        const template = templates[Math.floor(Math.random() * templates.length)];
-
-        return {
-            headline: template.headline,
-            source: this.randomFrom(['CNN', 'Fox News', 'Reuters', 'AP', 'NYTimes', 'WSJ']),
-            relevance: Math.random() * 0.5 + 0.5,
-            category: template.category,
-            actors: template.actors,
-            timestamp: Date.now()
-        };
-    }
-
-    randomFrom(array) {
-        return array[Math.floor(Math.random() * array.length)];
-    }
-
-    getTopRelevantNews() {
-        return this.currentNewsStories.sort((a, b) => b.relevance - a.relevance)[0];
+        return affected;
     }
 
     displayNewsTicker() {
@@ -510,928 +414,338 @@ class PresidentGame {
         this.currentNewsStories.forEach(story => {
             const item = document.createElement('span');
             item.className = 'news-item';
-            item.setAttribute('role', 'listitem');
-            item.tabIndex = 0;
-            item.textContent = `[${story.source}] ${story.headline}`;
+            
+            // Add emoji badge based on relevance
+            const badge = story.relevance > 0.75 ? '🔥' : 
+                         story.relevance > 0.5 ? '⚡' : '📰';
+            
+            item.innerHTML = `${badge} [${story.source}] ${story.headline}`;
             item.onclick = () => this.respondToNews(story);
-            item.addEventListener('keydown', event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    this.respondToNews(story);
-                }
-            });
             ticker.appendChild(item);
         });
     }
 
-    triggerBreakingNews(story) {
-        const existing = document.querySelector('.breaking-news-alert');
-        if (existing) existing.remove();
-
-        const alert = document.createElement('div');
-        alert.className = 'breaking-news-alert active';
-        alert.innerHTML = `
-            <div class="news-source">BREAKING NEWS - ${story.source}</div>
-            <h2 style="color: #fff; margin-bottom: 20px;">${story.headline}</h2>
-            <p style="color: #ddd; margin-bottom: 20px;">This requires your immediate attention!</p>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                <button class="decision-btn" data-action="dismiss">Dismiss</button>
-                <button class="decision-btn" data-action="tweet">Tweet Response</button>
-                <button class="decision-btn" data-action="call">Emergency Call</button>
-                <button class="decision-btn" data-action="crisis">Crisis Mode</button>
-            </div>
-        `;
-
-        alert.querySelectorAll('.decision-btn[data-action]').forEach(button => {
-            const action = button.dataset.action;
-            button.addEventListener('click', () => this.quickNewsResponse(action, story.headline));
-        });
-        document.body.appendChild(alert);
-
-        setTimeout(() => {
-            if (alert.parentNode) {
-                alert.remove();
-                this.chaos += 5;
-                this.showNotification('Ignored breaking news - chaos increases!');
-                this.updateDisplay();
-            }
-        }, 10000);
-    }
-
-    quickNewsResponse(action, headline) {
-        const alert = document.querySelector('.breaking-news-alert');
-        if (alert) alert.remove();
-
-        const story = this.currentNewsStories.find(s => s.headline === headline);
-        if (!story) return;
-
-        this.history.newsResponses.push({
-            story,
-            action,
-            timestamp: Date.now()
-        });
-
-        switch (action) {
-            case 'dismiss':
-                this.chaos += 10;
-                this.showNotification('Media criticizes your silence!');
-                break;
-            case 'tweet':
-                document.getElementById('tweetInput').value = `Regarding ${story.headline.substring(0, 50)}...`;
-                document.getElementById('tweetInput').focus();
-                break;
-            case 'call':
-                this.callRelevantActor(story);
-                break;
-            case 'crisis':
-                this.generateNewsBasedCrisis(story);
-                break;
-        }
-
-        this.updateDisplay();
-    }
-
-    callRelevantActor(story) {
-        const relevantActor = this.relationships.find(r =>
-            story.actors.some(actor => r.name.includes(actor))
-        );
-
-        if (relevantActor) {
-            this.initiatePhoneCall(relevantActor);
-        } else {
-            this.showNotification('No direct contact available.');
-        }
-    }
-
     respondToNews(story) {
-        if (this.processedNewsEvents.includes(story.headline)) return;
-
-        this.processedNewsEvents.push(story.headline);
-        this.generateNewsBasedCrisis(story);
-        this.showNotification(`Responding to: ${story.headline}`);
+        console.log('📰 Responding to:', story.headline);
+        this.generateUniversalCrisis(story);
+        this.showNotification(`⚡ ${story.headline.substring(0, 60)}...`);
     }
 
-    generateNewsBasedCrisis(story) {
+    // ============= UNIVERSAL CRISIS GENERATION =============
+
+    generateUniversalCrisis(story) {
+        // Show which power centers are affected
+        const affectedCenters = story.affectedCenters.length > 0 ? 
+            story.affectedCenters : this.guessAffectedCenters(story.category);
+
         const crisis = {
-            type: story.category,
-            category: story.category,
+            newsStory: story,
             title: `URGENT: ${story.headline}`,
-            description: `${story.source} reports this developing situation. Your response will shape public opinion.`,
-            newsSource: story.source,
-            options: this.generateNewsContextualOptions(story)
+            description: this.generateCrisisDescription(story, affectedCenters),
+            affectedCenters,
+            options: this.generateUniversalOptions(story, affectedCenters)
         };
 
         this.currentCrisis = crisis;
         this.displayCrisis();
-
-        story.actors.forEach(actor => {
-            const rel = this.relationships.find(r =>
-                r.name.includes(actor) || actor.includes(r.name.split(' ').pop())
-            );
-            if (rel && !rel.currentIssues.includes(story.category)) {
-                rel.currentIssues.push(story.category);
-            }
-        });
     }
 
-    generateNewsContextualOptions(story) {
+    guessAffectedCenters(category) {
+        const mapping = {
+            foreign: ['military', 'intelligence', 'congress'],
+            economy: ['wallstreet', 'industry', 'public'],
+            scandal: ['media', 'public', 'congress'],
+            military: ['military', 'intelligence', 'congress'],
+            healthcare: ['science', 'public', 'industry'],
+            domestic: ['congress', 'public', 'media']
+        };
+        return mapping[category] || ['public', 'media'];
+    }
+
+    generateCrisisDescription(story, affectedCenters) {
+        const centerNames = affectedCenters.map(id => {
+            const center = this.powerCenters.find(p => p.id === id);
+            return center ? `${center.icon} ${center.name}` : '';
+        }).filter(n => n).join(', ');
+
+        return `${story.source} reports this breaking development. Your response will impact: ${centerNames}`;
+    }
+
+    generateUniversalOptions(story, affectedCenters) {
         const options = [];
 
+        // Option 1: Strong Response
         options.push({
-            text: `Support the ${story.category === 'foreign' ? 'diplomatic' : 'legislative'} process`,
-            effect: 'diplomatic',
-            impacts: story.actors
+            text: '💪 Take Strong Action',
+            effects: affectedCenters.map(id => {
+                if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
+                if (id === 'media') return { center: id, change: -5 };
+                if (id === 'public') return { center: id, change: 15 };
+                return { center: id, change: 5 };
+            }),
+            chaos: 15,
+            energy: 20
         });
 
+        // Option 2: Diplomatic/Cautious
         options.push({
-            text: 'Blame the opposition',
-            effect: 'aggressive',
-            impacts: []
+            text: '🤝 Measured Response',
+            effects: affectedCenters.map(id => {
+                if (id === 'congress') return { center: id, change: 10 };
+                if (id === 'media') return { center: id, change: 8 };
+                if (id === 'military') return { center: id, change: -5 };
+                return { center: id, change: 5 };
+            }),
+            chaos: -5,
+            energy: 10
         });
 
-        if (story.category === 'economy') {
-            options.push({
-                text: 'Emergency economic measures',
-                effect: 'strategic',
-                impacts: []
-            });
-        }
-
-        if (story.category === 'foreign') {
-            options.push({
-                text: 'Military posturing',
-                effect: 'aggressive',
-                impacts: story.actors
-            });
-        }
-
-        if (story.category === 'scandal') {
-            options.push({
-                text: 'Launch counter-investigation',
-                effect: 'chaotic',
-                impacts: []
-            });
-        }
-
+        // Option 3: Blame/Attack
         options.push({
-            text: 'Twitter storm about fake news',
-            effect: 'chaotic',
-            impacts: []
+            text: '🔥 Attack Opponents',
+            effects: affectedCenters.map(id => {
+                if (id === 'public') return { center: id, change: 10 };
+                if (id === 'media') return { center: id, change: -15 };
+                if (id === 'congress') return { center: id, change: -10 };
+                return { center: id, change: -5 };
+            }),
+            chaos: 25,
+            energy: 15
+        });
+
+        // Option 4: Tweet Storm
+        options.push({
+            text: '🐦 Twitter Response',
+            effects: affectedCenters.map(id => {
+                if (id === 'public') return { center: id, change: 15 };
+                if (id === 'media') return { center: id, change: -10 };
+                return { center: id, change: Math.random() > 0.5 ? 5 : -5 };
+            }),
+            chaos: 20,
+            energy: 5
         });
 
         return options;
     }
 
-    gameLoop() {
-        this.day += 1;
-        this.updateGameContext();
+    displayCrisis() {
+        if (!this.currentCrisis) return;
 
-        this.chaos += this.currentContext.publicMood === 'angry' ? 2 : 1;
-        this.energy = Math.max(0, this.energy - 2);
-        this.score += 10;
+        const crisis = this.currentCrisis;
+        
+        document.getElementById('crisisTitle').textContent = crisis.title;
+        document.getElementById('crisisDescription').innerHTML = crisis.description;
 
-        this.updateDisplay();
+        // Show affected power centers
+        const affectedEl = document.getElementById('affectedCenters');
+        affectedEl.innerHTML = crisis.affectedCenters.map(id => {
+            const center = this.powerCenters.find(p => p.id === id);
+            return center ? `<span class="affected-badge">${center.icon} ${center.name}</span>` : '';
+        }).join('');
 
-        if (Math.random() < 0.15) {
-            this.triggerContextualEvent();
-        }
+        const optionsDiv = document.getElementById('crisisOptions');
+        optionsDiv.innerHTML = '';
 
-        if (Math.random() < 0.2) {
-            this.evolveRelationships();
-        }
-    }
-
-    updateGameContext() {
-        const recentChaos = this.history.decisions
-            .slice(-3)
-            .reduce((sum, d) => sum + (d.chaosChange || 0), 0);
-
-        if (recentChaos > 30) {
-            this.currentContext.publicMood = 'angry';
-        } else if (recentChaos < -10) {
-            this.currentContext.publicMood = 'happy';
-        } else {
-            this.currentContext.publicMood = 'neutral';
-        }
-
-        if (this.chaos > 70) {
-            this.currentContext.economicState = 'crisis';
-        } else if (this.chaos > 40) {
-            this.currentContext.economicState = 'unstable';
-        } else {
-            this.currentContext.economicState = 'stable';
-        }
-
-        const foreignRelations = this.relationships.filter(r =>
-            ['Vladimir Putin', 'Xi Jinping', 'Boris Johnson'].includes(r.name)
-        );
-        const avgTrust = foreignRelations.reduce((sum, r) => sum + r.trust, 0) / foreignRelations.length;
-
-        if (avgTrust < 30) {
-            this.currentContext.internationalTension = 'high';
-        } else if (avgTrust < 50) {
-            this.currentContext.internationalTension = 'medium';
-        } else {
-            this.currentContext.internationalTension = 'low';
-        }
-    }
-
-    generateContextualCrisis() {
-        const recentCrises = this.history.decisions.slice(-5).map(d => d.crisisType);
-
-        let crisisCategory;
-
-        if (this.currentContext.internationalTension === 'high') {
-            crisisCategory = 'international';
-        } else if (this.currentContext.economicState === 'crisis') {
-            crisisCategory = 'economic';
-        } else if (this.currentContext.publicMood === 'angry') {
-            crisisCategory = 'domestic';
-        } else {
-            const categories = ['domestic', 'international', 'economic', 'political'];
-            crisisCategory = categories[Math.floor(Math.random() * categories.length)];
-        }
-
-        const availableTypes = this.crisisTemplates[crisisCategory].filter(t => !recentCrises.includes(t));
-        const crisisType = availableTypes[Math.floor(Math.random() * availableTypes.length)] || 'general';
-
-        this.currentCrisis = this.generateCrisisDetails(crisisType, crisisCategory);
-        this.displayCrisis();
-    }
-
-    generateCrisisDetails(type, category) {
-        return {
-            type,
-            category,
-            title: this.generateCrisisTitle(type),
-            description: this.generateCrisisDescription(type),
-            options: this.generateCrisisOptions(type, category)
-        };
-    }
-
-    generateCrisisTitle(type) {
-        const titles = {
-            budget: 'GOVERNMENT SHUTDOWN IMMINENT',
-            scandal: 'BREAKING SCANDAL',
-            protest: 'MASSIVE PROTESTS ERUPTING',
-            'trade war': 'TRADE WAR ESCALATING',
-            'military conflict': 'MILITARY CRISIS',
-            'market crash': 'MARKETS IN FREEFALL',
-            impeachment: 'IMPEACHMENT THREAT'
-        };
-        return titles[type] || 'CRISIS EMERGING';
-    }
-
-    generateCrisisDescription(type) {
-        const descriptions = {
-            budget: `Congress deadlocked over spending. ${this.currentContext.economicState === 'crisis' ? 'Economic crisis worsening the situation.' : 'Time is running out.'}`,
-            scandal: `${this.history.scandals.length > 2 ? 'Another scandal rocks your administration' : 'Major allegations surfacing'}`,
-            protest: `Citizens taking to the streets. ${this.currentContext.publicMood === 'angry' ? 'Public fury reaching boiling point!' : 'Tensions rising.'}`,
-            'trade war': `${this.currentContext.internationalTension === 'high' ? 'International tensions exploding' : 'Trade disputes escalating'}`,
-            'military conflict': 'Military situation deteriorating rapidly',
-            'market crash': `Stock market plummeting. ${this.currentContext.economicState === 'crisis' ? 'Economic disaster unfolding!' : 'Investors panicking.'}`,
-            impeachment: 'Congress moving toward impeachment proceedings'
-        };
-        return descriptions[type] || 'Situation requires immediate attention.';
-    }
-
-    generateCrisisOptions(type) {
-        const options = [];
-
-        options.push({
-            text: this.generateAggressiveOption(type),
-            effect: 'aggressive',
-            impacts: this.determineImpactedParties(type, 'aggressive')
+        crisis.options.forEach(option => {
+            const btn = document.createElement('button');
+            btn.className = 'decision-btn';
+            btn.innerHTML = `
+                ${option.text}
+                <div class="option-preview">
+                    Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} | 
+                    Energy: -${option.energy}
+                </div>
+            `;
+            btn.onclick = () => this.handleUniversalDecision(option);
+            optionsDiv.appendChild(btn);
         });
 
-        if (this.getAverageRelationshipHealth() > 30) {
-            options.push({
-                text: this.generateDiplomaticOption(type),
-                effect: 'diplomatic',
-                impacts: this.determineImpactedParties(type, 'diplomatic')
-            });
-        }
-
-        if (this.energy > 30) {
-            options.push({
-                text: this.generateStrategicOption(type),
-                effect: 'strategic',
-                impacts: []
-            });
-        }
-
-        if (this.chaos > 50 || this.currentContext.publicMood === 'angry') {
-            options.push({
-                text: 'Double down on chaos',
-                effect: 'chaotic',
-                impacts: []
-            });
-        }
-
-        return options;
+        // Scroll crisis into view
+        document.getElementById('crisisPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    generateAggressiveOption(type) {
-        const options = {
-            budget: 'Threaten to shut down government',
-            scandal: 'Attack accusers viciously',
-            protest: 'Deploy federal forces',
-            'trade war': 'Impose massive tariffs',
-            'military conflict': 'Military strike',
-            'market crash': 'Blame the Fed',
-            impeachment: 'Threaten Congress'
-        };
-        return options[type] || 'Attack everyone';
-    }
+    handleUniversalDecision(option) {
+        // Apply effects to power centers
+        option.effects.forEach(effect => {
+            this.updatePowerCenter(effect.center, effect.change, 'Your decision');
+        });
 
-    generateDiplomaticOption(type) {
-        const options = {
-            budget: 'Negotiate compromise',
-            scandal: 'Address nation calmly',
-            protest: 'Meet with protest leaders',
-            'trade war': 'Seek diplomatic solution',
-            'military conflict': 'Emergency diplomacy',
-            'market crash': 'Reassure markets',
-            impeachment: 'Cooperate with investigation'
-        };
-        return options[type] || 'Seek peaceful solution';
-    }
+        // Apply game state changes
+        this.chaos = Math.max(0, Math.min(100, this.chaos + option.chaos));
+        this.energy = Math.max(0, this.energy - option.energy);
+        this.score += Math.abs(option.chaos) * 5;
 
-    generateStrategicOption(type) {
-        const options = {
-            budget: 'Executive order workaround',
-            scandal: 'Strategic distraction',
-            protest: 'Announce reforms',
-            'trade war': 'Multilateral approach',
-            'military conflict': 'Covert operations',
-            'market crash': 'Emergency measures',
-            impeachment: 'Legal maneuvering'
-        };
-        return options[type] || 'Complex strategic move';
-    }
-
-    determineImpactedParties(type, approach) {
-        const impacted = [];
-
-        if (type === 'budget' && approach === 'aggressive') {
-            impacted.push('Chuck Schumer', 'Nancy Pelosi');
-        } else if (type === 'trade war') {
-            impacted.push('Xi Jinping');
-        } else if (type === 'military conflict') {
-            impacted.push('Vladimir Putin');
-        }
-
-        return impacted;
-    }
-
-    getAverageRelationshipHealth() {
-        const total = this.relationships.reduce((sum, r) => sum + r.trust + r.respect, 0);
-        return total / (this.relationships.length * 2);
-    }
-
-    initiatePhoneCall(caller) {
-        if (caller.lastInteraction && Date.now() - caller.lastInteraction < 30000) {
-            this.showNotification(`${caller.name} is not available right now`);
-            return;
-        }
-
-        this.currentCaller = caller;
-        caller.lastInteraction = Date.now();
-
-        const demand = this.generateContextualDemand(caller);
-        caller.currentDemand = demand;
-
-        this.history.phoneCalls.push({
-            caller: caller.name,
-            demand,
+        this.history.decisions.push({
+            crisis: this.currentCrisis.title,
+            option: option.text,
+            effects: option.effects,
             timestamp: Date.now()
         });
 
-        document.getElementById('phoneInterface').classList.add('active');
-        document.getElementById('overlay').classList.add('active');
-        document.getElementById('callerName').textContent = caller.name;
+        this.showNotification(`Decision made: ${option.text}`);
+        this.updateDisplay();
 
-        const info = document.getElementById('negotiationInfo');
-        info.innerHTML = `
-            <div style="color: #fff;">
-                <div>Trust: ${caller.trust}%</div>
-                <div>Respect: ${caller.respect}%</div>
-                <div>Fear: ${caller.fear}%</div>
-                <div style="margin-top: 10px; color: #ffd700;">Current Demand:</div>
-                <div>${demand.text}</div>
-                <div style="margin-top: 10px; color: #aaa; font-size: 12px;">Context: ${demand.context}</div>
+        // Generate next crisis after delay
+        setTimeout(() => {
+            if (this.currentNewsStories.length > 0) {
+                const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
+                this.generateUniversalCrisis(randomNews);
+            } else {
+                this.generateContextualCrisis();
+            }
+        }, 3000);
+    }
+
+    // ============= BREAKING NEWS ALERT =============
+
+    triggerBreakingNews(story) {
+        const existing = document.querySelector('.breaking-news-modal');
+        if (existing) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'breaking-news-modal';
+        modal.innerHTML = `
+            <div class="breaking-news-content">
+                <div class="breaking-badge">🚨 BREAKING NEWS 🚨</div>
+                <h2>${story.headline}</h2>
+                <p style="color: #ddd; margin: 20px 0;">This requires immediate presidential response!</p>
+                <div class="breaking-power-centers">
+                    ${story.affectedCenters.map(id => {
+                        const center = this.powerCenters.find(p => p.id === id);
+                        return center ? `<span class="affected-badge">${center.icon} ${center.name}</span>` : '';
+                    }).join('')}
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="breaking-btn primary" onclick="game.respondToBreakingNews('${story.headline}')">
+                        RESPOND NOW
+                    </button>
+                    <button class="breaking-btn secondary" onclick="game.dismissBreakingNews()">
+                        Ignore (Chaos +10)
+                    </button>
+                </div>
             </div>
         `;
 
-        this.displayContextualLeverageCards(caller, demand);
+        document.body.appendChild(modal);
+        
+        // Auto-dismiss after 15 seconds
+        setTimeout(() => {
+            if (modal.parentNode) {
+                this.chaos += 10;
+                this.updateDisplay();
+                modal.remove();
+                this.showNotification('⚠️ Ignored breaking news - chaos increased!');
+            }
+        }, 15000);
     }
 
-    generateContextualDemand(caller) {
-        const recentDemands = this.history.phoneCalls
-            .filter(c => c.caller === caller.name)
-            .slice(-3)
-            .map(c => c.demand.issue);
-
-        const availableIssues = caller.currentIssues.filter(i => !recentDemands.includes(i));
-        const issue = availableIssues[Math.floor(Math.random() * availableIssues.length)] || caller.currentIssues[0];
-
-        let demandText;
-        let context;
-
-        if (caller.personality === 'aggressive' && caller.fear < 50) {
-            demandText = this.generateAggressiveDemand(caller, issue);
-            context = 'They seem confrontational';
-        } else if (caller.trust > 60) {
-            demandText = this.generateFriendlyDemand(caller, issue);
-            context = 'They seem cooperative';
-        } else {
-            demandText = this.generateNeutralDemand(caller, issue);
-            context = 'Standard diplomatic approach';
+    respondToBreakingNews(headline) {
+        const story = this.currentNewsStories.find(s => s.headline === headline);
+        const modal = document.querySelector('.breaking-news-modal');
+        if (modal) modal.remove();
+        
+        if (story) {
+            this.generateUniversalCrisis(story);
         }
-
-        return { text: demandText, issue, context };
     }
 
-    generateAggressiveDemand(caller, issue) {
-        const demands = {
-            sanctions: 'Remove all sanctions immediately or face consequences',
-            trade: 'Accept our trade terms or we impose tariffs',
-            budget: 'Pass our budget or we shut down government',
-            healthcare: 'Kill that healthcare bill or we block everything'
-        };
-        return demands[issue] || `Strong action needed on ${issue}`;
+    dismissBreakingNews() {
+        const modal = document.querySelector('.breaking-news-modal');
+        if (modal) modal.remove();
+        this.chaos += 10;
+        this.updateDisplay();
+        this.showNotification('⚠️ Breaking news ignored - media trust drops');
+        this.updatePowerCenter('media', -10, 'Ignored breaking news');
     }
 
-    generateFriendlyDemand(caller, issue) {
-        const demands = {
-            sanctions: 'Could we discuss easing some sanctions?',
-            trade: "Let's work together on a trade deal",
-            budget: 'We need to find common ground on the budget',
-            healthcare: 'Can we collaborate on healthcare reform?'
-        };
-        return demands[issue] || `Let's cooperate on ${issue}`;
+    // ============= NEWS CACHING =============
+
+    cacheNews(stories) {
+        try {
+            const cache = {
+                stories: stories.slice(0, 50),
+                timestamp: Date.now()
+            };
+            localStorage.setItem('newsCache', JSON.stringify(cache));
+        } catch (e) {
+            console.warn('Failed to cache news:', e);
+        }
     }
 
-    generateNeutralDemand(caller, issue) {
-        const demands = {
-            sanctions: 'We need to address the sanctions issue',
-            trade: 'Trade negotiations must move forward',
-            budget: 'The budget situation needs resolution',
-            healthcare: 'Healthcare policy requires attention'
-        };
-        return demands[issue] || `We must discuss ${issue}`;
+    loadNewsCache() {
+        try {
+            const cache = localStorage.getItem('newsCache');
+            if (cache) {
+                const parsed = JSON.parse(cache);
+                // Only use cache if less than 24 hours old
+                if (Date.now() - parsed.timestamp < 86400000) {
+                    return parsed.stories;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load news cache:', e);
+        }
+        return null;
     }
 
-    displayContextualLeverageCards(caller, demand) {
-        const container = document.getElementById('leverageCards');
-        container.innerHTML = '';
-
-        const leverageOptions = this.generateLeverageOptions(caller, demand);
-
-        leverageOptions.forEach(option => {
-            const cardEl = document.createElement('div');
-            cardEl.className = 'leverage-card';
-            cardEl.innerHTML = `
-                <div style="font-weight: bold;">${option.name}</div>
-                <div style="font-size: 12px; margin-top: 5px;">
-                    Success: ${option.successChance}% | Risk: ${option.risk}
-                </div>
-            `;
-            cardEl.onclick = () => this.useContextualLeverage(option, caller, cardEl);
-            container.appendChild(cardEl);
-        });
+    loadCachedNews() {
+        const cached = this.loadNewsCache();
+        if (cached && cached.length > 0) {
+            this.currentNewsStories = cached;
+            this.displayNewsTicker();
+            console.log('📦 Using cached news');
+        } else {
+            // Ultimate fallback
+            this.loadMockNews();
+        }
     }
 
-    generateLeverageOptions(caller) {
-        const options = [
+    loadMockNews() {
+        this.currentNewsStories = [
             {
-                name: 'Agree to demands',
-                successChance: 90,
-                risk: 'Low',
-                effect: 'cooperative'
+                headline: 'Congress Debates Infrastructure Bill Worth $2 Trillion',
+                source: 'Reuters',
+                relevance: 0.9,
+                category: 'domestic',
+                affectedCenters: ['congress', 'public', 'industry'],
+                timestamp: Date.now()
             },
             {
-                name: 'Refuse outright',
-                successChance: 20,
-                risk: 'High',
-                effect: 'aggressive'
-            }
-        ];
-
-        if (caller.fear > 30) {
-            options.push({
-                name: 'Threaten retaliation',
-                successChance: Math.round(50 + caller.fear / 2),
-                risk: 'Very High',
-                effect: 'intimidation'
-            });
-        }
-
-        if (caller.trust > 40) {
-            options.push({
-                name: 'Propose compromise',
-                successChance: Math.round(30 + caller.trust / 2),
-                risk: 'Medium',
-                effect: 'diplomatic'
-            });
-        }
-
-        if (caller.respect > 50) {
-            options.push({
-                name: 'Appeal to shared interests',
-                successChance: Math.round(40 + caller.respect / 3),
-                risk: 'Low',
-                effect: 'strategic'
-            });
-        }
-
-        if (this.currentContext.economicState === 'crisis' && caller.currentDemand.issue === 'trade') {
-            options.push({
-                name: 'Emergency economic deal',
-                successChance: 70,
-                risk: 'Medium',
-                effect: 'desperate'
-            });
-        }
-
-        return options;
-    }
-
-    useContextualLeverage(option, caller, element) {
-        if (element.classList.contains('used')) return;
-        element.classList.add('used');
-
-        const success = Math.random() * 100 < option.successChance;
-
-        if (option.effect === 'cooperative') {
-            this.updateRelationship(caller.name, 15, 10, -10);
-            this.chaos = Math.max(0, this.chaos - 10);
-            this.showNotification(`Agreement reached with ${caller.name}`);
-        } else if (option.effect === 'aggressive' && success) {
-            this.updateRelationship(caller.name, -20, -10, 20);
-            this.chaos += 15;
-            this.showNotification(`${caller.name} backs down... for now`);
-        } else if (option.effect === 'diplomatic' && success) {
-            this.updateRelationship(caller.name, 10, 15, 0);
-            this.showNotification(`Compromise reached with ${caller.name}`);
-        } else if (!success) {
-            this.updateRelationship(caller.name, -15, -20, 10);
-            this.chaos += 20;
-            this.showNotification(`${caller.name} is furious! Negotiations failed!`);
-        }
-
-        caller.history.push({
-            demand: caller.currentDemand,
-            response: option.name,
-            success,
-            timestamp: Date.now()
-        });
-
-        this.energy -= 15;
-        this.updateDisplay();
-
-        setTimeout(() => this.endCall(), 2000);
-    }
-
-    triggerContextualEvent() {
-        const eventTypes = [];
-
-        if (this.currentContext.economicState === 'crisis') {
-            eventTypes.push('market_panic', 'unemployment_spike', 'bank_failure');
-        }
-
-        if (this.currentContext.internationalTension === 'high') {
-            eventTypes.push('diplomatic_incident', 'military_provocation', 'alliance_strain');
-        }
-
-        if (this.currentContext.publicMood === 'angry') {
-            eventTypes.push('protest', 'riot', 'approval_drop');
-        }
-
-        this.relationships.forEach(rel => {
-            if (rel.trust < 20 && Math.random() < 0.3) {
-                eventTypes.push({ type: 'betrayal', actor: rel.name });
-            }
-            if (rel.fear > 70 && Math.random() < 0.2) {
-                eventTypes.push({ type: 'submission', actor: rel.name });
-            }
-        });
-
-        if (eventTypes.length === 0) {
-            eventTypes.push('routine_news', 'minor_scandal', 'policy_debate');
-        }
-
-        const selectedEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-        this.executeContextualEvent(selectedEvent);
-    }
-
-    executeContextualEvent(event) {
-        let notification;
-        let impact = {};
-
-        if (typeof event === 'object') {
-            if (event.type === 'betrayal') {
-                notification = `${event.actor} betrays you publicly!`;
-                impact = { chaos: 20, relationship: { name: event.actor, trust: -30, respect: -20 } };
-
-                if (Math.random() < 0.5) {
-                    setTimeout(() => this.triggerScandal(), 2000);
-                }
-            } else if (event.type === 'submission') {
-                notification = `${event.actor} caves to your pressure`;
-                impact = { chaos: -10, score: 100, relationship: { name: event.actor, respect: -10, fear: 10 } };
-            }
-        } else {
-            switch (event) {
-                case 'market_panic':
-                    notification = 'MARKETS CRASHING! Dow down 1000 points!';
-                    impact = { chaos: 25, economic: 'worse' };
-                    break;
-                case 'diplomatic_incident':
-                    notification = 'International incident developing!';
-                    impact = { chaos: 15, tension: 'increase' };
-                    const foreignLeader = this.relationships.find(r =>
-                        ['Vladimir Putin', 'Xi Jinping'].includes(r.name)
-                    );
-                    if (foreignLeader) {
-                        setTimeout(() => this.initiatePhoneCall(foreignLeader), 3000);
-                    }
-                    break;
-                case 'protest':
-                    notification = 'Massive protests outside White House!';
-                    impact = { chaos: 10, publicMood: 'worse' };
-                    break;
-                default:
-                    notification = 'News cycle churning...';
-                    impact = { chaos: 2 };
-            }
-        }
-
-        this.showNotification(notification);
-        this.applyEventImpact(impact);
-    }
-
-    applyEventImpact(impact) {
-        if (impact.chaos) {
-            this.chaos = Math.min(100, Math.max(0, this.chaos + impact.chaos));
-        }
-
-        if (impact.score) {
-            this.score += impact.score;
-        }
-
-        if (impact.relationship) {
-            this.updateRelationship(
-                impact.relationship.name,
-                impact.relationship.trust || 0,
-                impact.relationship.respect || 0,
-                impact.relationship.fear || 0
-            );
-        }
-
-        if (impact.economic === 'worse') {
-            this.currentContext.economicState = 'crisis';
-        }
-
-        if (impact.tension === 'increase') {
-            this.currentContext.internationalTension = 'high';
-        }
-
-        this.updateDisplay();
-    }
-
-    evolveRelationships() {
-        this.relationships.forEach(rel => {
-            if (rel.personality === 'strategic') {
-                if (!rel.lastInteraction || Date.now() - rel.lastInteraction > 60000) {
-                    rel.trust = Math.max(0, rel.trust - 3);
-                }
-            } else if (rel.personality === 'aggressive') {
-                rel.fear = Math.min(100, rel.fear + 1);
-                rel.respect = Math.max(0, rel.respect - 1);
-            } else if (rel.personality === 'patient') {
-                rel.trust = Math.min(100, rel.trust + 1);
-            }
-
-            if (this.currentContext.economicState === 'crisis' && !rel.currentIssues.includes('economy')) {
-                rel.currentIssues.push('economy');
-            }
-        });
-
-        this.displayRelationships();
-    }
-
-    generateQuestion(reporter) {
-        const recentEvents = this.history.decisions.slice(-3);
-        const recentTweets = this.history.tweets.slice(-3);
-        const recentScandals = this.history.scandals.slice(-2);
-        const recentNews = this.history.newsResponses.slice(-2);
-
-        let questionPool = [];
-
-        if (recentNews.length > 0) {
-            const lastNewsResponse = recentNews[recentNews.length - 1];
-            questionPool.push(
-                `How do you respond to ${lastNewsResponse.story.source}'s report?`,
-                `Can you explain your ${lastNewsResponse.action} to the recent news?`
-            );
-        }
-
-        if (reporter.specialty === 'scandal' && recentScandals.length > 0) {
-            questionPool.push(
-                `Can you address the ${recentScandals[recentScandals.length - 1].type} scandal?`,
-                'Why should Americans trust you after recent events?',
-                'Will anyone be held accountable?'
-            );
-        } else if (reporter.specialty === 'economy' && this.currentContext.economicState !== 'stable') {
-            questionPool.push(
-                "What's your plan to fix the economy?",
-                'How do you respond to market volatility?',
-                'Are you concerned about unemployment?'
-            );
-        } else if (reporter.specialty === 'policy' && recentEvents.length > 0) {
-            const lastCrisis = recentEvents[recentEvents.length - 1];
-            questionPool.push(
-                `Can you explain your ${lastCrisis.action} decision?`,
-                "What's your legislative agenda?",
-                'How will you work with Congress?'
-            );
-        }
-
-        if (reporter.mood === 'hostile') {
-            questionPool.push(
-                'Why are you failing the American people?',
-                'Do you take any responsibility?',
-                'When will you resign?'
-            );
-        } else if (reporter.mood === 'friendly') {
-            questionPool.push(
-                'What achievements are you most proud of?',
-                'How do you stay strong under pressure?',
-                "What's your vision for America?"
-            );
-        }
-
-        const controversialTweets = recentTweets.filter(t => t.chaos > 20);
-        if (controversialTweets.length > 0) {
-            questionPool.push(
-                'Can you clarify your recent tweet?',
-                'Do you regret what you tweeted?',
-                'Is Twitter the appropriate platform for policy?'
-            );
-        }
-
-        if (questionPool.length === 0) {
-            questionPool = [
-                'What are your priorities?',
-                'How do you respond to critics?',
-                "What's next for your administration?"
-            ];
-        }
-
-        return questionPool[Math.floor(Math.random() * questionPool.length)];
-    }
-
-    triggerScandal() {
-        if (this.scandalActive) return;
-
-        const scandalType = this.generateScandalType();
-
-        this.scandalActive = true;
-        this.currentScandal = scandalType;
-
-        this.history.scandals.push({
-            type: scandalType,
-            timestamp: Date.now(),
-            contained: false
-        });
-
-        document.getElementById('scandalControl').classList.add('active');
-        document.getElementById('overlay').classList.add('active');
-
-        const scandalTitle = document.querySelector('#scandalControl h2');
-        scandalTitle.textContent = `${scandalType.toUpperCase()} SCANDAL SPREADING!`;
-
-        const grid = document.getElementById('scandalGrid');
-        grid.innerHTML = '';
-
-        for (let i = 0; i < 9; i++) {
-            const node = document.createElement('div');
-            node.className = 'scandal-node';
-            node.dataset.infected = 'false';
-            node.onclick = () => this.containNode(node);
-            grid.appendChild(node);
-        }
-
-        this.startScandalSpread();
-        this.createContextualDamageControl(scandalType);
-    }
-
-    generateScandalType() {
-        const types = [];
-
-        if (this.history.tweets.some(t => t.chaos > 30)) {
-            types.push('twitter');
-        }
-
-        if (this.relationships.some(r => r.trust < 20)) {
-            types.push('betrayal');
-        }
-
-        if (this.currentContext.economicState === 'crisis') {
-            types.push('financial');
-        }
-
-        if (this.history.newsResponses.some(r => r.action === 'dismiss')) {
-            types.push('coverup');
-        }
-
-        types.push('personal', 'corruption', 'coverup');
-
-        return types[Math.floor(Math.random() * types.length)];
-    }
-
-    createContextualDamageControl(scandalType) {
-        const control = document.getElementById('damageControl');
-        control.innerHTML = '';
-
-        const strategies = this.generateDamageControlStrategies(scandalType);
-
-        strategies.forEach(strategy => {
-            const btn = document.createElement('button');
-            btn.className = 'decision-btn';
-            btn.style.width = '100%';
-            btn.innerHTML = `${strategy.name}<br><span style="font-size: 10px;">Success: ${Math.round(strategy.effectiveness * 100)}%</span>`;
-            btn.onclick = () => this.executeSmartDamageControl(strategy);
-            control.appendChild(btn);
-        });
-    }
-
-    generateDamageControlStrategies(scandalType) {
-        const strategies = [
+                headline: 'China Warns Against Taiwan Independence',
+                source: 'CNN',
+                relevance: 0.8,
+                category: 'foreign',
+                affectedCenters: ['military', 'intelligence', 'wallstreet'],
+                timestamp: Date.now()
+            },
             {
-                name: 'Deny Everything',
-                approach: 'aggressive',
-                effectiveness: scandalType === 'twitter' ? 0.3 : 0.5
+                headline: 'Fed Considers Interest Rate Hike Amid Inflation',
+                source: 'Bloomberg',
+                relevance: 0.7,
+                category: 'economy',
+                affectedCenters: ['wallstreet', 'public', 'industry'],
+                timestamp: Date.now()
             }
         ];
-
-        if (scandalType === 'twitter') {
-            strategies.push({
-                name: 'Claim account was hacked',
-                approach: 'deflect',
-                effectiveness: 0.4
-            });
-        }
-
-        if (scandalType === 'financial') {
-            strategies.push({
-                name: 'Release tax returns',
-                approach: 'transparent',
-                effectiveness: 0.7
-            });
-        }
-
-        if (this.relationships.some(r => r.trust > 70)) {
-            strategies.push({
-                name: 'Get allies to defend you',
-                approach: 'coalition',
-                effectiveness: 0.6
-            });
-        }
-
-        strategies.push({
-            name: 'Create bigger story',
-            approach: 'distraction',
-            effectiveness: Math.random() * 0.8 + 0.2
-        });
-
-        return strategies;
+        this.displayNewsTicker();
+        console.log('📦 Using mock news (offline mode)');
     }
 
-    executeSmartDamageControl(strategy) {
-        clearInterval(this.scandalInterval);
+    // ============= EXISTING SYSTEMS (KEPT FOR COMPATIBILITY) =============
 
-        const success = Math.random() < strategy.effectiveness;
-
-        if (success) {
-            this.chaos = Math.max(0, this.chaos - 20);
-            this.score += 100;
-            this.showNotification(`Strategy worked! Scandal contained!`);
-            this.history.scandals[this.history.scandals.length - 1].contained = true;
-        } else {
-            this.chaos += 15;
-            this.showNotification(`Strategy failed! Scandal worsens!`);
-
-            if (strategy.approach === 'aggressive') {
-                this.reporters.forEach(r => {
-                    r.trust = Math.max(0, r.trust - 20);
-                    if (r.mood === 'neutral') r.mood = 'hostile';
-                });
-            }
-        }
-
-        this.closeScandal();
+    generateContextualCrisis() {
+        // Fallback crisis generator
+        const crisis = {
+            title: 'Domestic Policy Challenge',
+            description: 'Congress is demanding action on a critical issue.',
+            affectedCenters: ['congress', 'public'],
+            options: this.generateUniversalOptions(
+                { category: 'domestic', headline: 'Policy Challenge' },
+                ['congress', 'public']
+            )
+        };
+        this.currentCrisis = crisis;
+        this.displayCrisis();
     }
 
     sendTweet() {
@@ -1445,114 +759,114 @@ class PresidentGame {
 
         this.history.tweets.push({
             content,
-            timestamp: Date.now(),
-            chaos: 0
+            timestamp: Date.now()
         });
 
-        const hotWords = ['fake', 'disaster', 'tremendous', 'witch hunt', 'enemy'];
-        let tweetChaos = 0;
+        const hotWords = ['fake', 'disaster', 'tremendous', 'witch hunt', 'enemy', 'failing'];
+        let tweetChaos = 5;
         hotWords.forEach(word => {
             if (content.toLowerCase().includes(word)) {
                 tweetChaos += 10;
             }
         });
 
-        this.relationships.forEach(rel => {
-            const lastName = rel.name.split(' ').pop();
-            if (content.toLowerCase().includes(lastName.toLowerCase())) {
-                if (content.toLowerCase().includes('great') || content.toLowerCase().includes('friend')) {
-                    this.updateRelationship(rel.name, 15, 10, 0);
-                } else if (content.toLowerCase().includes('bad') || content.toLowerCase().includes('terrible')) {
-                    this.updateRelationship(rel.name, -20, -15, 15);
-                    tweetChaos += 15;
-                }
-            }
-        });
+        // Affect power centers
+        if (content.toLowerCase().includes('media') || content.toLowerCase().includes('fake news')) {
+            this.updatePowerCenter('media', -15, 'Your tweet');
+        }
+        if (content.toLowerCase().includes('congress')) {
+            this.updatePowerCenter('congress', -10, 'Your tweet');
+        }
+        
+        this.updatePowerCenter('public', tweetChaos > 15 ? 10 : 5, 'Your tweet');
 
         this.chaos = Math.min(100, this.chaos + tweetChaos);
         this.score += tweetChaos * 10;
-        this.history.tweets[this.history.tweets.length - 1].chaos = tweetChaos;
 
         input.value = '';
-
-        this.triggerDopamineHit(tweetChaos > 20 ? 'VIRAL!' : 'SENT!');
         this.showNotification(`Tweet sent! Chaos +${tweetChaos}`);
+        this.updateDisplay();
+    }
+
+    gameLoop() {
+        this.day += 1;
+        this.energy = Math.max(0, this.energy - 2);
+        this.score += 10;
+
+        // Small random power center drift
+        if (Math.random() < 0.3) {
+            const randomCenter = this.powerCenters[Math.floor(Math.random() * this.powerCenters.length)];
+            const drift = (Math.random() - 0.5) * 4;
+            this.updatePowerCenter(randomCenter.id, drift, 'Daily drift');
+        }
 
         this.updateDisplay();
     }
 
-    displayCrisis() {
-        if (!this.currentCrisis) return;
+    initiatePhoneCall(caller) {
+        // Simplified phone call system
+        this.showNotification(`📞 ${caller.name} is calling...`);
+    }
 
-        document.getElementById('crisisTitle').textContent = this.currentCrisis.title;
-        document.getElementById('crisisDescription').textContent = this.currentCrisis.description;
+    startPressConference() {
+        document.getElementById('pressConference').classList.add('active');
+        this.setupReporters();
+    }
 
-        const optionsDiv = document.getElementById('crisisOptions');
-        optionsDiv.innerHTML = '';
+    endPressConference() {
+        document.getElementById('pressConference').classList.remove('active');
+    }
 
-        this.currentCrisis.options.forEach(option => {
-            const btn = document.createElement('button');
-            btn.className = 'decision-btn';
-            btn.textContent = option.text;
-            btn.onclick = () => this.handleDecision(option);
-            optionsDiv.appendChild(btn);
+    setupReporters() {
+        const row = document.getElementById('reportersRow');
+        row.innerHTML = '';
+
+        this.reporters.forEach(reporter => {
+            const reporterEl = document.createElement('div');
+            reporterEl.className = `reporter ${reporter.mood}`;
+            reporterEl.innerHTML = `
+                <div style="font-weight: bold;">${reporter.name}</div>
+                <div style="font-size: 12px;">${reporter.outlet}</div>
+            `;
+            reporterEl.onclick = () => this.selectReporter(reporter, reporterEl);
+            row.appendChild(reporterEl);
         });
     }
 
-    handleDecision(option) {
-        this.history.decisions.push({
-            crisisType: this.currentCrisis.type,
-            action: option.text,
-            timestamp: Date.now(),
-            chaosChange: 0
-        });
+    selectReporter(reporter, element) {
+        document.querySelectorAll('.reporter').forEach(r => r.classList.remove('selected'));
+        element.classList.add('selected');
+        this.currentReporter = reporter;
+        
+        const question = `How do you respond to recent events?`;
+        document.getElementById('currentQuestion').textContent = `${reporter.name} asks: "${question}"`;
+    }
 
-        let chaosChange = 0;
-        if (option.effect === 'aggressive') {
-            chaosChange = 15;
-            this.energy -= 10;
-            this.score += 50;
-        } else if (option.effect === 'diplomatic') {
-            chaosChange = -5;
-            this.energy -= 5;
-            this.score += 30;
-        } else if (option.effect === 'strategic') {
-            chaosChange = 5;
-            this.energy -= 15;
-            this.score += 70;
-        } else if (option.effect === 'chaotic') {
-            chaosChange = 25;
-            this.energy -= 20;
-            this.score += 100;
+    pressResponse(style) {
+        if (!this.currentReporter) {
+            this.showNotification('Select a reporter first!');
+            return;
         }
 
-        this.chaos = Math.min(100, Math.max(0, this.chaos + chaosChange));
-        this.history.decisions[this.history.decisions.length - 1].chaosChange = chaosChange;
+        const effects = {
+            attack: { media: -15, public: 10, chaos: 15 },
+            deflect: { media: -5, public: 0, chaos: 5 },
+            answer: { media: 10, public: 5, chaos: -5 },
+            joke: { media: Math.random() > 0.5 ? 10 : -10, public: 5, chaos: 10 }
+        };
 
-        if (option.impacts && option.impacts.length > 0) {
-            option.impacts.forEach(name => {
-                const rel = this.relationships.find(r => r.name === name);
-                if (rel) {
-                    if (option.effect === 'aggressive') {
-                        this.updateRelationship(name, -15, -10, 20);
-                    } else if (option.effect === 'diplomatic') {
-                        this.updateRelationship(name, 10, 15, -5);
-                    }
-                }
-            });
-        }
-
-        this.showNotification(`You chose: ${option.text}`);
+        const effect = effects[style];
+        if (effect.media) this.updatePowerCenter('media', effect.media, `Press conference`);
+        if (effect.public) this.updatePowerCenter('public', effect.public, `Press conference`);
+        this.chaos = Math.max(0, Math.min(100, this.chaos + effect.chaos));
+        
+        this.energy -= 5;
+        this.score += 20;
+        
+        this.showNotification(`You ${style} the question!`);
         this.updateDisplay();
-
-        setTimeout(() => {
-            if (Math.random() < 0.5 && this.currentNewsStories.length > 0) {
-                const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
-                this.generateNewsBasedCrisis(randomNews);
-            } else {
-                this.generateContextualCrisis();
-            }
-        }, 3000);
+        this.currentReporter = null;
+        document.getElementById('currentQuestion').textContent = '';
     }
 
     displayRelationships() {
@@ -1564,226 +878,13 @@ class PresidentGame {
             card.className = 'relationship-card';
             card.innerHTML = `
                 <div class="relationship-name">${rel.name}</div>
-                <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">${rel.role}</div>
-                <div class="meter">
-                    <div class="meter-fill trust-fill" style="width: ${rel.trust}%"></div>
-                </div>
-                <div style="font-size: 10px; color: #aaa;">Trust: ${rel.trust}%</div>
-                <div class="meter">
-                    <div class="meter-fill respect-fill" style="width: ${rel.respect}%"></div>
-                </div>
-                <div style="font-size: 10px; color: #aaa;">Respect: ${rel.respect}%</div>
-                <div class="meter">
-                    <div class="meter-fill fear-fill" style="width: ${rel.fear}%"></div>
-                </div>
-                <div style="font-size: 10px; color: #aaa;">Fear: ${rel.fear}%</div>
+                <div style="font-size: 12px; color: #aaa;">${rel.role}</div>
+                <div class="meter"><div class="meter-fill trust-fill" style="width: ${rel.trust}%"></div></div>
+                <div style="font-size: 10px;">Trust: ${rel.trust}%</div>
             `;
-            card.onclick = () => this.negotiateWith(rel);
+            card.onclick = () => this.initiatePhoneCall(rel);
             grid.appendChild(card);
         });
-    }
-
-    updateRelationship(name, trustChange = 0, respectChange = 0, fearChange = 0) {
-        const rel = this.relationships.find(r => r.name === name);
-        if (!rel) return;
-
-        rel.trust = Math.max(0, Math.min(100, rel.trust + trustChange));
-        rel.respect = Math.max(0, Math.min(100, rel.respect + respectChange));
-        rel.fear = Math.max(0, Math.min(100, rel.fear + fearChange));
-
-        this.displayRelationships();
-
-        if (trustChange !== 0 || respectChange !== 0 || fearChange !== 0) {
-            const changes = [];
-            if (trustChange !== 0) changes.push(`Trust ${trustChange > 0 ? '+' : ''}${trustChange}`);
-            if (respectChange !== 0) changes.push(`Respect ${respectChange > 0 ? '+' : ''}${respectChange}`);
-            if (fearChange !== 0) changes.push(`Fear ${fearChange > 0 ? '+' : ''}${fearChange}`);
-
-            this.showNotification(`${name}: ${changes.join(', ')}`);
-        }
-    }
-
-    negotiateWith(rel) {
-        if (Math.random() < 0.5 && !document.getElementById('phoneInterface').classList.contains('active')) {
-            this.initiatePhoneCall(rel);
-        } else {
-            const success = Math.random() < (rel.trust / 100);
-
-            if (success) {
-                this.score += 50;
-                this.chaos = Math.max(0, this.chaos - 10);
-                this.updateRelationship(rel.name, 10, 5, 0);
-                this.showNotification(`Successful negotiation with ${rel.name}!`);
-            } else {
-                this.chaos += 5;
-                this.updateRelationship(rel.name, -10, -5, 10);
-                this.showNotification(`${rel.name} rejects your proposal!`);
-            }
-
-            this.energy -= 10;
-            this.updateDisplay();
-        }
-    }
-
-    setupReporters() {
-        const row = document.getElementById('reportersRow');
-        row.innerHTML = '';
-
-        this.reporters.forEach(reporter => {
-            const reporterEl = document.createElement('div');
-            reporterEl.className = `reporter ${reporter.mood}`;
-            reporterEl.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 5px;">${reporter.name}</div>
-                <div style="font-size: 12px; color: #aaa; margin-bottom: 8px;">${reporter.outlet}</div>
-                <div class="meter">
-                    <div class="meter-fill" style="width: ${reporter.trust}%; background: ${
-                        reporter.mood === 'hostile' ? '#ff0000' :
-                        reporter.mood === 'friendly' ? '#00ff00' : '#ffff00'
-                    }"></div>
-                </div>
-            `;
-            reporterEl.onclick = () => this.selectReporter(reporter, reporterEl);
-            row.appendChild(reporterEl);
-        });
-    }
-
-    startPressConference() {
-        document.getElementById('pressConference').classList.add('active');
-        this.showNotification('Press Conference Started!');
-        this.setupReporters();
-
-        this.history.pressConferences.push({
-            timestamp: Date.now(),
-            context: this.currentContext
-        });
-    }
-
-    endPressConference() {
-        document.getElementById('pressConference').classList.remove('active');
-        this.currentReporter = null;
-        document.getElementById('currentQuestion').textContent = '';
-        document.querySelectorAll('.reporter').forEach(r => r.classList.remove('selected'));
-    }
-
-    selectReporter(reporter, element) {
-        document.querySelectorAll('.reporter').forEach(r => r.classList.remove('selected'));
-        element.classList.add('selected');
-
-        this.currentReporter = reporter;
-        this.currentQuestion = this.generateQuestion(reporter);
-        document.getElementById('currentQuestion').textContent = `${reporter.name} asks: "${this.currentQuestion}"`;
-    }
-
-    pressResponse(style) {
-        if (!this.currentReporter) {
-            this.showNotification('Select a reporter first!');
-            return;
-        }
-
-        let chaosChange = 0;
-        let scoreChange = 0;
-        let message = '';
-
-        if (style === 'attack') {
-            chaosChange = 15;
-            scoreChange = 30;
-            message = 'You attack the media!';
-            this.currentReporter.trust = Math.max(0, this.currentReporter.trust - 20);
-        } else if (style === 'deflect') {
-            chaosChange = 5;
-            scoreChange = 20;
-            message = 'You deflect the question!';
-            this.currentReporter.trust = Math.max(0, this.currentReporter.trust - 10);
-        } else if (style === 'answer') {
-            chaosChange = -5;
-            scoreChange = 10;
-            message = 'You provide a direct answer.';
-            this.currentReporter.trust = Math.min(100, this.currentReporter.trust + 10);
-        } else if (style === 'joke') {
-            chaosChange = 10;
-            scoreChange = 50;
-            message = 'You make a joke!';
-            if (Math.random() < 0.5) {
-                message += ' It lands well!';
-                this.currentReporter.trust = Math.min(100, this.currentReporter.trust + 15);
-            } else {
-                message += ' Awkward silence...';
-                chaosChange = 20;
-            }
-        }
-
-        this.chaos = Math.max(0, Math.min(100, this.chaos + chaosChange));
-        this.score += scoreChange;
-        this.energy -= 5;
-
-        this.showNotification(message);
-        this.updateDisplay();
-        this.setupReporters();
-
-        this.currentReporter = null;
-        document.getElementById('currentQuestion').textContent = '';
-        document.querySelectorAll('.reporter').forEach(r => r.classList.remove('selected'));
-    }
-
-    startScandalSpread() {
-        const nodes = document.querySelectorAll('.scandal-node');
-        const randomNode = nodes[Math.floor(Math.random() * nodes.length)];
-        randomNode.classList.add('infected');
-        randomNode.dataset.infected = 'true';
-
-        this.scandalInterval = setInterval(() => {
-            const uninfected = document.querySelectorAll('.scandal-node:not(.infected)');
-            if (uninfected.length === 0) {
-                this.scandalFullySpread();
-                return;
-            }
-
-            const toInfect = uninfected[Math.floor(Math.random() * uninfected.length)];
-            toInfect.classList.add('infected');
-            toInfect.dataset.infected = 'true';
-
-            this.chaos += 3;
-            this.updateDisplay();
-        }, 2000);
-    }
-
-    containNode(node) {
-        if (node.dataset.infected === 'true') {
-            node.classList.remove('infected');
-            node.dataset.infected = 'false';
-            this.chaos = Math.max(0, this.chaos - 5);
-            this.energy -= 5;
-            this.updateDisplay();
-            this.showNotification('Scandal contained in this area!');
-        }
-    }
-
-    scandalFullySpread() {
-        clearInterval(this.scandalInterval);
-        this.chaos = Math.min(100, this.chaos + 30);
-        this.showNotification('SCANDAL WENT VIRAL! Major damage to presidency!');
-        this.triggerDopamineHit('DISASTER!');
-
-        this.relationships.forEach(rel => {
-            rel.trust = Math.max(0, rel.trust - 20);
-            rel.respect = Math.max(0, rel.respect - 15);
-        });
-        this.displayRelationships();
-
-        this.closeScandal();
-    }
-
-    closeScandal() {
-        this.scandalActive = false;
-        clearInterval(this.scandalInterval);
-        document.getElementById('scandalControl').classList.remove('active');
-        document.getElementById('overlay').classList.remove('active');
-    }
-
-    endCall() {
-        document.getElementById('phoneInterface').classList.remove('active');
-        document.getElementById('overlay').classList.remove('active');
-        this.currentCaller = null;
     }
 
     updateDisplay() {
@@ -1804,143 +905,7 @@ class PresidentGame {
 
         setTimeout(() => notif.remove(), 3000);
     }
-
-    triggerDopamineHit(text) {
-        const burst = document.createElement('div');
-        burst.className = 'dopamine-burst';
-        burst.textContent = text;
-        document.body.appendChild(burst);
-
-        setTimeout(() => burst.remove(), 1000);
-    }
 }
 
-// In constructor
-this.aiCallsToday = 0;
-this.maxFreeAICalls = 3;
-
-// Add these methods
-async generateAINarrative(newsStory, generationType) {
-  if (this.aiCallsToday >= this.maxFreeAICalls) {
-    this.showNotification('Upgrade to Premium for unlimited AI crises!');
-    this.generateFallbackCrisis(newsStory);
-    return;
-  }
-  this.aiCallsToday++;
-  try {
-    const response = await fetch('/api/ai-narrative', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        playerContext: {
-          history: this.history,
-          relationships: this.relationships,
-          decisions: this.history.decisions
-        },
-        newsHeadline: newsStory.headline,
-        generationType
-      })
-    });
-    const data = await response.json();
-    if (data.success) {
-      this.applyNarrative(data.narrative, generationType);
-      this.showNotification(`AI Crisis: ${data.narrative.headline || data.narrative.event}`);
-    } else {
-      this.generateFallbackCrisis(newsStory);
-    }
-  } catch (error) {
-    console.error('AI Narrative Fetch Error:', error);
-    this.generateFallbackCrisis(newsStory);
-  }
-}
-
-applyNarrative(narrative, generationType) {
-  if (generationType === 'scandal') {
-    this.chaos += narrative.impacts.chaos || 0;
-    this.energy += narrative.impacts.energy || 0;
-    this.score += narrative.impacts.score || 0;
-    narrative.impacts.relationships.forEach(rel => {
-      const target = this.relationships.find(r => r.name === rel.name);
-      if (target) {
-        target.trust = Math.max(0, Math.min(100, target.trust + (rel.trust || 0)));
-        target.respect = Math.max(0, Math.min(100, target.respect + (rel.respect || 0)));
-        target.fear = Math.max(0, Math.min(100, target.fear + (rel.fear || 0)));
-      }
-    });
-    this.history.scandals.push(narrative);
-  } else if (generationType === 'diplomaticTwist') {
-    this.currentCrisis = {
-      event: narrative.event,
-      options: narrative.options,
-      outcomes: narrative.outcomes
-    };
-    this.updateCrisisPanel();
-  }
-  this.updateDisplay();
-  this.displayRelationships();
-}
-
-generateFallbackCrisis(newsStory) {
-  const crisis = {
-    headline: `Fallback: ${newsStory.headline}`,
-    description: 'A generic crisis based on news.',
-    impacts: { chaos: 10, energy: -5, score: -10, relationships: [] }
-  };
-  this.applyNarrative(crisis, 'scandal');
-}
-
-async generateNewsBasedCrisis(topStory) {
-  if (Math.random() < 0.5) {
-    await this.generateAINarrative(topStory, 'scandal');
-  } else {
-    await this.generateAINarrative(topStory, 'diplomaticTwist');
-  }
-}
-
-updateCrisisPanel() {
-  const panel = document.getElementById('crisisPanel');
-  if (this.currentCrisis) {
-    panel.innerHTML = `
-      <h3>${this.currentCrisis.event}</h3>
-      <div class="crisis-options">
-        ${this.currentCrisis.options.map((opt, i) => `
-          <button class="response-btn" onclick="game.handleCrisisOption(${i})">${opt}</button>
-        `).join('')}
-      </div>
-      <button class="response-btn" onclick="game.startPressConference()">Hold Press Conference</button>
-    `;
-  } else {
-    panel.innerHTML = `
-      <h3>Crisis Loading...</h3>
-      <p>Preparing situation...</p>
-      <button class="response-btn" onclick="game.startPressConference()">Hold Press Conference</button>
-    `;
-  }
-}
-
-handleCrisisOption(index) {
-  const outcome = this.currentCrisis.outcomes[index];
-  this.chaos += outcome.chaos || 0;
-  this.energy += outcome.energy || 0;
-  this.score += outcome.score || 0;
-  outcome.relationships.forEach(rel => {
-    const target = this.relationships.find(r => r.name === rel.name);
-    if (target) {
-      target.trust = Math.max(0, Math.min(100, target.trust + (rel.trust || 0)));
-      target.respect = Math.max(0, Math.min(100, target.respect + (rel.respect || 0)));
-      target.fear = Math.max(0, Math.min(100, target.fear + (rel.fear || 0)));
-    }
-  });
-  this.history.decisions.push({ event: this.currentCrisis.event, option: this.currentCrisis.options[index], outcome });
-  this.showNotification(`Decision made: ${outcome.chaos > 0 ? 'Chaos rises!' : 'Situation stabilized!'}`);
-  this.currentCrisis = null;
-  this.updateDisplay();
-  this.displayRelationships();
-  this.updateCrisisPanel();
-}
-
-
-console.log('President Simulator - Total Chaos Edition loaded successfully');
-
-
+console.log('President Simulator - Influence Network Edition loaded');
 window.startPresidency = startPresidency;
