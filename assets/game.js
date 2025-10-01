@@ -388,7 +388,38 @@ class PresidentGame {
             }
             // Exponential backoff: wait 500ms before retrying
             await new Promise(resolve => setTimeout(resolve, 500));
-            resp = await attempt();
+            // Log the first error at debug level
+            if (typeof this.debugTrace === 'function') {
+                this.debugTrace('AI narrative fetch error (first attempt)', { error: String(err), stack: err?.stack });
+            }
+            // Check if error is transient (network or 5xx)
+            let shouldRetry = false;
+            if (err && typeof err === 'object') {
+                // If error is from fetchJson or fetch, check status
+                if (err.message && /ai-narrative (\d+)/.test(err.message)) {
+                    const status = Number(err.message.match(/ai-narrative (\d+)/)[1]);
+                    if (status >= 500 && status < 600) {
+                        shouldRetry = true;
+                    }
+                } else if (err.name === 'TypeError' || err.message?.includes('NetworkError')) {
+                    // Network error
+                    shouldRetry = true;
+                }
+            }
+            if (shouldRetry) {
+                // Basic backoff before retrying
+                await new Promise(res => setTimeout(res, 500));
+                try {
+                    resp = await attempt();
+                } catch (err2) {
+                    if (typeof this.debugTrace === 'function') {
+                        this.debugTrace('AI narrative fetch error (second attempt)', { error: String(err2), stack: err2?.stack });
+                    }
+                    throw err2;
+                }
+            } else {
+                throw err;
+            }
         }
 
         if (!resp || !resp.narrative) {
