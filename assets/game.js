@@ -361,20 +361,11 @@ class PresidentGame {
         };
 
         const attempt = async () => {
-            if (typeof this.fetchJson === 'function') {
-                return this.fetchJson('/api/ai-narrative', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-            }
-            const res = await fetch('/api/ai-narrative', {
+            return this.fetchJson('/api/ai-narrative', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) throw new Error('ai-narrative ' + res.status);
-            return res.json();
         };
 
         let resp;
