@@ -384,7 +384,18 @@ class PresidentGame {
             resp = await attempt();
         }
 
-        if (!resp || !resp.narrative) throw new Error('Bad AI payload');
+        if (!resp || !resp.narrative) {
+            const keys = resp && typeof resp === 'object' ? Object.keys(resp) : [];
+            let snippet = '';
+            try {
+                snippet = JSON.stringify(resp, null, 2).slice(0, 200);
+            } catch (e) {
+                snippet = String(resp);
+            }
+            throw new Error(
+                `Bad AI payload: missing narrative (keys: ${keys.join(', ')})\nPayload snippet: ${snippet}`
+            );
+        }
 
         const n = resp.narrative;
         const impacts = n.impacts || n.impact || {};
