@@ -151,12 +151,25 @@ class PresidentGame {
         setTimeout(() => this.fetchRealPoliticalNews(), 2000);
         
         this.setupReporters();
+        this.setupTwitterInput();
         
         // Generate initial crisis
         setTimeout(() => this.generateContextualCrisis(), 1000);
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
         this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000); // Every 10 min
+    }
+
+    setupTwitterInput() {
+        const input = document.getElementById('tweetInput');
+        
+        // Add Enter key handler: Enter = send, Shift+Enter = new line
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendTweet();
+            }
+        });
     }
 
     // ============= POWER CENTER SYSTEM =============

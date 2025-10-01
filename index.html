@@ -51,10 +51,17 @@
 
             <!-- TWEET STORM SYSTEM -->
             <div class="tweet-panel">
-                <h3 style="color: #fff; margin-bottom: 15px;">🐦 TWEET</h3>
+                <h3 style="color: #fff; margin-bottom: 15px;">🐦 TWEET STORM</h3>
                 <textarea class="tweet-input" id="tweetInput" 
                        placeholder="What's on your mind, Mr. President?" maxlength="280"></textarea>
-                <button class="tweet-btn" onclick="game.sendTweet()">SEND</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <button class="tweet-btn" onclick="game.sendTweet()">
+                        📤 SEND TWEET
+                    </button>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.7);">
+                        Press Enter to send
+                    </span>
+                </div>
                 <div class="tweet-feedback-container" id="tweetFeedback"></div>
             </div>
         </div>
