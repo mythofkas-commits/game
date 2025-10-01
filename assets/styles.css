@@ -141,6 +141,25 @@ body {
     gap: 15px;
 }
 
+.status-explainer {
+    background: rgba(0, 0, 0, 0.6);
+    border-left: 3px solid #ffd700;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.status-explainer p {
+    margin-bottom: 6px;
+}
+
+.status-explainer p:last-child {
+    margin-bottom: 0;
+}
+
 /* NEWS TICKER - SLOWER SPEED */
 .news-ticker {
     background: linear-gradient(90deg, #8b0000, #ff0000, #8b0000);
