@@ -35,24 +35,28 @@
             </div>
         </div>
 
-        <!-- POWER CENTERS - THE CORE SYSTEM -->
-        <div class="power-centers-panel">
-            <h3 style="color: #ffd700; margin-bottom: 10px;">🎯 POWER CENTERS</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">
-                Your decisions affect these power centers. Watch for cascading effects!
-            </p>
-            <div class="power-centers-grid" id="powerCentersGrid"></div>
-            <div class="coalition-status" id="coalitionStatus">
-                📊 Political Balance Maintained
+        <!-- POWER CENTERS + TWITTER SIDE BY SIDE -->
+        <div class="top-panels-container">
+            <!-- POWER CENTERS - THE CORE SYSTEM -->
+            <div class="power-centers-panel">
+                <h3 style="color: #ffd700; margin-bottom: 10px;">🎯 POWER CENTERS</h3>
+                <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">
+                    Your decisions affect these power centers. Watch for cascading effects!
+                </p>
+                <div class="power-centers-grid" id="powerCentersGrid"></div>
+                <div class="coalition-status" id="coalitionStatus">
+                    📊 Political Balance Maintained
+                </div>
             </div>
-        </div>
 
-        <!-- TWEET STORM SYSTEM -->
-        <div class="tweet-panel">
-            <h3 style="color: #fff; margin-bottom: 15px;">🐦 TWEET STORM SYSTEM</h3>
-            <input type="text" class="tweet-input" id="tweetInput" 
-                   placeholder="What's on your mind, Mr. President?" maxlength="280">
-            <button class="tweet-btn" onclick="game.sendTweet()">SEND TWEET</button>
+            <!-- TWEET STORM SYSTEM -->
+            <div class="tweet-panel">
+                <h3 style="color: #fff; margin-bottom: 15px;">🐦 TWEET</h3>
+                <textarea class="tweet-input" id="tweetInput" 
+                       placeholder="What's on your mind, Mr. President?" maxlength="280"></textarea>
+                <button class="tweet-btn" onclick="game.sendTweet()">SEND</button>
+                <div class="tweet-feedback-container" id="tweetFeedback"></div>
+            </div>
         </div>
 
         <!-- CRISIS PANEL -->

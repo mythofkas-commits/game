@@ -1,7 +1,8 @@
 /*
 =============================================================================
 PRESIDENT SIMULATOR - TOTAL CHAOS EDITION
-Influence Network System
+Smart Twitter Algorithm + Adaptive Crisis System
+Place this file at: assets/game.js
 =============================================================================
 */
 
@@ -50,39 +51,40 @@ class PresidentGame {
             powerChanges: []
         };
 
+        // UPDATED POLITICIANS (2025)
         this.relationships = [
             {
                 name: 'Chuck Schumer',
                 trust: 30,
                 respect: 40,
                 fear: 20,
-                role: 'Senate Leader',
+                role: 'Senate Majority Leader',
                 personality: 'strategic',
                 lastInteraction: null,
                 history: [],
                 currentIssues: ['budget', 'healthcare']
             },
             {
-                name: 'Mitch McConnell',
+                name: 'John Thune',
                 trust: 60,
                 respect: 50,
                 fear: 10,
-                role: 'Senate GOP',
+                role: 'Senate GOP Leader',
                 personality: 'calculating',
                 lastInteraction: null,
                 history: [],
                 currentIssues: ['taxes', 'judges']
             },
             {
-                name: 'Nancy Pelosi',
-                trust: 20,
-                respect: 30,
-                fear: 30,
+                name: 'Mike Johnson',
+                trust: 55,
+                respect: 45,
+                fear: 15,
                 role: 'House Speaker',
-                personality: 'aggressive',
+                personality: 'ideological',
                 lastInteraction: null,
                 history: [],
-                currentIssues: ['impeachment', 'oversight']
+                currentIssues: ['spending', 'border']
             },
             {
                 name: 'Vladimir Putin',
@@ -105,6 +107,17 @@ class PresidentGame {
                 lastInteraction: null,
                 history: [],
                 currentIssues: ['trade', 'taiwan', 'technology']
+            },
+            {
+                name: 'Keir Starmer',
+                trust: 65,
+                respect: 50,
+                fear: 5,
+                role: 'UK Prime Minister',
+                personality: 'pragmatic',
+                lastInteraction: null,
+                history: [],
+                currentIssues: ['brexit', 'trade', 'nato']
             }
         ];
 
@@ -116,7 +129,6 @@ class PresidentGame {
         ];
 
         this.currentReporter = null;
-        this.currentQuestion = '';
         this.currentCrisis = null;
         this.scandalActive = false;
         this.scandalInterval = null;
@@ -125,19 +137,23 @@ class PresidentGame {
         this.newsInterval = null;
         this.lastNewsFetch = 0;
         this.pendingCascades = [];
-        this.aiCallsToday = 0;
-        this.maxFreeAICalls = 3;
     }
 
     async init() {
         this.updateDisplay();
         this.displayPowerCenters();
         this.displayRelationships();
-        await this.loadInitialNews();
+        
+        // Show mock news immediately
+        this.loadMockNews();
+        
+        // Then fetch real news
+        setTimeout(() => this.fetchRealPoliticalNews(), 2000);
+        
         this.setupReporters();
         
         // Generate initial crisis
-        this.generateContextualCrisis();
+        setTimeout(() => this.generateContextualCrisis(), 1000);
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
         this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000); // Every 10 min
@@ -263,24 +279,231 @@ class PresidentGame {
         const coalitionEl = document.getElementById('coalitionStatus');
         if (hostile.length >= 3) {
             coalitionEl.innerHTML = `⚠️ <strong>Coalition Against You:</strong> ${hostile.map(h => h.icon).join(' ')}`;
-            coalitionEl.className = 'coalition-warning';
+            coalitionEl.className = 'coalition-status coalition-warning';
         } else if (allies.length >= 3) {
             coalitionEl.innerHTML = `✅ <strong>Strong Coalition:</strong> ${allies.map(a => a.icon).join(' ')}`;
-            coalitionEl.className = 'coalition-positive';
+            coalitionEl.className = 'coalition-status coalition-positive';
         } else {
             coalitionEl.innerHTML = '📊 Political Balance Maintained';
-            coalitionEl.className = '';
+            coalitionEl.className = 'coalition-status';
         }
     }
 
-    // ============= NEWS SYSTEM (SHOW ALL) =============
+    // ============= SMART TWITTER ALGORITHM =============
 
-    async loadInitialNews() {
-        const ticker = document.getElementById('newsTickerContent');
-        ticker.innerHTML = '<span class="news-item">📡 Loading real political news...</span>';
+    sendTweet() {
+        const input = document.getElementById('tweetInput');
+        const content = input.value.trim();
+
+        if (!content) {
+            this.showNotification('❌ Tweet is empty!');
+            return;
+        }
+
+        // Analyze the tweet
+        const analysis = this.analyzeTweet(content);
+
+        this.history.tweets.push({
+            content,
+            analysis,
+            timestamp: Date.now()
+        });
+
+        // Apply effects to power centers
+        Object.entries(analysis.powerEffects).forEach(([centerId, change]) => {
+            if (Math.abs(change) > 0) {
+                this.updatePowerCenter(centerId, change, 'Your tweet');
+            }
+        });
+
+        // Apply game effects
+        this.chaos = Math.min(100, this.chaos + analysis.chaos);
+        this.energy -= analysis.energyCost;
+        this.score += analysis.score;
+
+        input.value = '';
         
-        await this.fetchRealPoliticalNews();
+        // Show detailed feedback
+        this.showTweetFeedback(analysis);
+        this.updateDisplay();
     }
+
+    analyzeTweet(tweet) {
+        const lower = tweet.toLowerCase();
+        const analysis = {
+            tone: 'neutral',
+            targets: [],
+            keywords: [],
+            powerEffects: {},
+            chaos: 5,
+            energyCost: 5,
+            score: 10,
+            warnings: []
+        };
+
+        // TONE DETECTION
+        const aggressiveWords = ['attack', 'destroy', 'enemy', 'war', 'fight', 'crush', 'annihilate', 'terrible', 'disaster', 'pathetic', 'loser', 'worst'];
+        const diplomaticWords = ['cooperate', 'together', 'discuss', 'solution', 'partnership', 'dialogue', 'understanding', 'respect'];
+        const profanity = ['damn', 'hell', 'crap', 'shit', 'fuck', 'ass'];
+
+        let aggressiveScore = 0;
+        let diplomaticScore = 0;
+
+        aggressiveWords.forEach(word => {
+            if (lower.includes(word)) aggressiveScore++;
+        });
+        diplomaticWords.forEach(word => {
+            if (lower.includes(word)) diplomaticScore++;
+        });
+
+        if (aggressiveScore > diplomaticScore) {
+            analysis.tone = 'aggressive';
+            analysis.chaos += 15;
+            analysis.powerEffects.military = 10;
+            analysis.powerEffects.media = -10;
+            analysis.powerEffects.public = 15;
+        } else if (diplomaticScore > aggressiveScore) {
+            analysis.tone = 'diplomatic';
+            analysis.chaos -= 5;
+            analysis.powerEffects.congress = 10;
+            analysis.powerEffects.media = 8;
+            analysis.powerEffects.military = -5;
+        }
+
+        // PROFANITY CHECK
+        profanity.forEach(word => {
+            if (lower.includes(word)) {
+                analysis.chaos += 20;
+                analysis.powerEffects.media = (analysis.powerEffects.media || 0) - 15;
+                analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 10;
+                analysis.warnings.push('Profanity increased chaos!');
+            }
+        });
+
+        // ALL CAPS CHECK
+        if (tweet === tweet.toUpperCase() && tweet.length > 10) {
+            analysis.chaos += 10;
+            analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 8;
+            analysis.warnings.push('ALL CAPS = Maximum engagement!');
+        }
+
+        // TARGET DETECTION
+        if (lower.match(/media|press|fake news|cnn|fox|nbc|reporters?/)) {
+            analysis.targets.push('media');
+            analysis.powerEffects.media = (analysis.powerEffects.media || 0) - 15;
+            analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 10;
+            analysis.chaos += 10;
+        }
+
+        if (lower.match(/congress|senate|house|legislat/)) {
+            analysis.targets.push('congress');
+            analysis.powerEffects.congress = (analysis.powerEffects.congress || 0) - 10;
+        }
+
+        if (lower.match(/china|chinese|xi|beijing/)) {
+            analysis.targets.push('china');
+            analysis.powerEffects.wallstreet = (analysis.powerEffects.wallstreet || 0) - 10;
+            analysis.powerEffects.military = (analysis.powerEffects.military || 0) + 5;
+            analysis.chaos += 15;
+        }
+
+        if (lower.match(/russia|russian|putin|moscow/)) {
+            analysis.targets.push('russia');
+            analysis.powerEffects.intelligence = (analysis.powerEffects.intelligence || 0) + 5;
+            analysis.powerEffects.military = (analysis.powerEffects.military || 0) + 5;
+            analysis.chaos += 10;
+        }
+
+        if (lower.match(/market|stock|economy|wall street|dow/)) {
+            analysis.targets.push('markets');
+            if (analysis.tone === 'aggressive') {
+                analysis.powerEffects.wallstreet = (analysis.powerEffects.wallstreet || 0) - 15;
+                analysis.warnings.push('Markets don\'t like uncertainty!');
+            } else {
+                analysis.powerEffects.wallstreet = (analysis.powerEffects.wallstreet || 0) + 5;
+            }
+        }
+
+        // SPECIAL PATTERNS
+        if (lower.match(/fake news/)) {
+            analysis.powerEffects.media = (analysis.powerEffects.media || 0) - 20;
+            analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 15;
+            analysis.chaos += 15;
+            analysis.warnings.push('"Fake news" enrages media!');
+        }
+
+        if (lower.match(/witch hunt/)) {
+            analysis.powerEffects.media = (analysis.powerEffects.media || 0) - 10;
+            analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 10;
+            analysis.chaos += 10;
+        }
+
+        // EMOJI CHECK
+        const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+        if (emojiRegex.test(tweet)) {
+            analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 5;
+            analysis.warnings.push('Emojis increase public appeal!');
+        }
+
+        // LENGTH CHECK
+        if (tweet.length > 200) {
+            analysis.energyCost += 5;
+            analysis.warnings.push('Long tweet = more effort');
+        }
+
+        // SPELLING/TYPO CHECK (intentional)
+        const commonTypos = ['covfefe', 'unpresidented', 'hamberder', 'smocking'];
+        commonTypos.forEach(typo => {
+            if (lower.includes(typo)) {
+                analysis.powerEffects.media = (analysis.powerEffects.media || 0) - 10;
+                analysis.powerEffects.public = (analysis.powerEffects.public || 0) + 5;
+                analysis.chaos += 5;
+                analysis.warnings.push('Typo goes viral!');
+            }
+        });
+
+        // SCORE CALCULATION
+        analysis.score = Math.abs(analysis.chaos) * 5 + Object.values(analysis.powerEffects).reduce((sum, val) => sum + Math.abs(val), 0) * 2;
+
+        return analysis;
+    }
+
+    showTweetFeedback(analysis) {
+        const feedback = document.createElement('div');
+        feedback.className = 'tweet-feedback';
+        
+        let feedbackHTML = `<strong>Tweet Analysis:</strong><br>`;
+        feedbackHTML += `Tone: ${analysis.tone.toUpperCase()} | Chaos: +${analysis.chaos}<br>`;
+        
+        if (analysis.warnings.length > 0) {
+            feedbackHTML += `⚠️ ${analysis.warnings.join(' ')}<br>`;
+        }
+        
+        const significantEffects = Object.entries(analysis.powerEffects)
+            .filter(([_, val]) => Math.abs(val) >= 5)
+            .map(([center, val]) => {
+                const c = this.powerCenters.find(p => p.id === center);
+                return c ? `${c.icon} ${val > 0 ? '+' : ''}${val}` : '';
+            })
+            .filter(s => s);
+        
+        if (significantEffects.length > 0) {
+            feedbackHTML += `Impact: ${significantEffects.join(', ')}`;
+        }
+
+        feedback.innerHTML = feedbackHTML;
+        document.getElementById('tweetFeedback').appendChild(feedback);
+
+        setTimeout(() => feedback.remove(), 5000);
+    }
+
+    focusTwitter() {
+        const input = document.getElementById('tweetInput');
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ============= NEWS SYSTEM (SHOW ALL) =============
 
     async checkForNewsUpdate() {
         const timeSince = Date.now() - this.lastNewsFetch;
@@ -430,13 +653,13 @@ class PresidentGame {
 
     respondToNews(story) {
         console.log('📰 Responding to:', story.headline);
-        this.generateUniversalCrisis(story);
+        this.generateAdaptiveCrisis(story);
         this.showNotification(`⚡ ${story.headline.substring(0, 60)}...`);
     }
 
-    // ============= UNIVERSAL CRISIS GENERATION =============
+    // ============= ADAPTIVE CRISIS GENERATION =============
 
-    generateUniversalCrisis(story) {
+    generateAdaptiveCrisis(story) {
         // Show which power centers are affected
         const affectedCenters = story.affectedCenters.length > 0 ? 
             story.affectedCenters : this.guessAffectedCenters(story.category);
@@ -446,7 +669,7 @@ class PresidentGame {
             title: `URGENT: ${story.headline}`,
             description: this.generateCrisisDescription(story, affectedCenters),
             affectedCenters,
-            options: this.generateUniversalOptions(story, affectedCenters)
+            options: this.generateAdaptiveOptions(story, affectedCenters)
         };
 
         this.currentCrisis = crisis;
@@ -474,59 +697,155 @@ class PresidentGame {
         return `${story.source} reports this breaking development. Your response will impact: ${centerNames}`;
     }
 
-    generateUniversalOptions(story, affectedCenters) {
+    generateAdaptiveOptions(story, affectedCenters) {
         const options = [];
+        const category = story.category;
+        const headline = story.headline.toLowerCase();
 
-        // Option 1: Strong Response
-        options.push({
-            text: '💪 Take Strong Action',
-            effects: affectedCenters.map(id => {
-                if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
-                if (id === 'media') return { center: id, change: -5 };
-                if (id === 'public') return { center: id, change: 15 };
-                return { center: id, change: 5 };
-            }),
-            chaos: 15,
-            energy: 20
-        });
+        // Option 1: Context-specific aggressive response
+        if (category === 'foreign') {
+            options.push({
+                text: headline.includes('china') ? '🚢 Deploy Naval Forces' : 
+                      headline.includes('russia') ? '🎯 Increase Sanctions' :
+                      '💪 Show Military Strength',
+                effects: affectedCenters.map(id => {
+                    if (id === 'military') return { center: id, change: 15 };
+                    if (id === 'wallstreet') return { center: id, change: -15 };
+                    if (id === 'intelligence') return { center: id, change: 10 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 20,
+                energy: 25
+            });
+        } else if (category === 'economy') {
+            options.push({
+                text: headline.includes('inflation') ? '🏦 Emergency Fed Meeting' :
+                      headline.includes('market') ? '💵 Stimulus Package' :
+                      '📊 Economic Intervention',
+                effects: affectedCenters.map(id => {
+                    if (id === 'wallstreet') return { center: id, change: 15 };
+                    if (id === 'industry') return { center: id, change: 10 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 10,
+                energy: 20
+            });
+        } else if (category === 'scandal') {
+            options.push({
+                text: '⚔️ Attack Accusers',
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: -20 };
+                    if (id === 'public') return { center: id, change: 10 };
+                    if (id === 'congress') return { center: id, change: -10 };
+                    return { center: id, change: -5 };
+                }),
+                chaos: 25,
+                energy: 15
+            });
+        } else {
+            options.push({
+                text: '💪 Take Strong Action',
+                effects: affectedCenters.map(id => {
+                    if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: -5 };
+                    if (id === 'public') return { center: id, change: 15 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 15,
+                energy: 20
+            });
+        }
 
-        // Option 2: Diplomatic/Cautious
-        options.push({
-            text: '🤝 Measured Response',
-            effects: affectedCenters.map(id => {
-                if (id === 'congress') return { center: id, change: 10 };
-                if (id === 'media') return { center: id, change: 8 };
-                if (id === 'military') return { center: id, change: -5 };
-                return { center: id, change: 5 };
-            }),
-            chaos: -5,
-            energy: 10
-        });
+        // Option 2: Context-specific diplomatic response
+        if (category === 'foreign') {
+            options.push({
+                text: '🤝 Diplomatic Negotiations',
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 12 };
+                    if (id === 'military') return { center: id, change: -8 };
+                    if (id === 'media') return { center: id, change: 10 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: -5,
+                energy: 15
+            });
+        } else if (category === 'economy') {
+            options.push({
+                text: '📋 Bipartisan Commission',
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 15 };
+                    if (id === 'media') return { center: id, change: 8 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: -8,
+                energy: 12
+            });
+        } else {
+            options.push({
+                text: '🤝 Measured Response',
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: 8 };
+                    if (id === 'military') return { center: id, change: -5 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: -5,
+                energy: 10
+            });
+        }
 
-        // Option 3: Blame/Attack
+        // Option 3: Twitter Response (always available)
         options.push({
-            text: '🔥 Attack Opponents',
+            text: '🐦 Tweet About It',
             effects: affectedCenters.map(id => {
-                if (id === 'public') return { center: id, change: 10 };
-                if (id === 'media') return { center: id, change: -15 };
-                if (id === 'congress') return { center: id, change: -10 };
-                return { center: id, change: -5 };
-            }),
-            chaos: 25,
-            energy: 15
-        });
-
-        // Option 4: Tweet Storm
-        options.push({
-            text: '🐦 Twitter Response',
-            effects: affectedCenters.map(id => {
-                if (id === 'public') return { center: id, change: 15 };
-                if (id === 'media') return { center: id, change: -10 };
+                if (id === 'public') return { center: id, change: 12 };
+                if (id === 'media') return { center: id, change: -8 };
                 return { center: id, change: Math.random() > 0.5 ? 5 : -5 };
             }),
-            chaos: 20,
-            energy: 5
+            chaos: 15,
+            energy: 5,
+            action: 'focusTwitter'
         });
+
+        // Option 4: Context-specific bold move
+        if (category === 'scandal') {
+            options.push({
+                text: '🎤 Emergency Press Conference',
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: 10 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 3 };
+                }),
+                chaos: 5,
+                energy: 15,
+                action: 'pressConference'
+            });
+        } else if (category === 'military') {
+            options.push({
+                text: '🎖️ Emergency War Powers',
+                effects: affectedCenters.map(id => {
+                    if (id === 'military') return { center: id, change: 20 };
+                    if (id === 'congress') return { center: id, change: -15 };
+                    if (id === 'public') return { center: id, change: 10 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 30,
+                energy: 25
+            });
+        } else {
+            options.push({
+                text: '🔥 Attack Opponents',
+                effects: affectedCenters.map(id => {
+                    if (id === 'public') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: -15 };
+                    if (id === 'congress') return { center: id, change: -10 };
+                    return { center: id, change: -5 };
+                }),
+                chaos: 25,
+                energy: 15
+            });
+        }
 
         return options;
     }
@@ -559,7 +878,7 @@ class PresidentGame {
                     Energy: -${option.energy}
                 </div>
             `;
-            btn.onclick = () => this.handleUniversalDecision(option);
+            btn.onclick = () => this.handleDecision(option);
             optionsDiv.appendChild(btn);
         });
 
@@ -567,7 +886,16 @@ class PresidentGame {
         document.getElementById('crisisPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    handleUniversalDecision(option) {
+    handleDecision(option) {
+        // Special actions
+        if (option.action === 'focusTwitter') {
+            this.focusTwitter();
+            return;
+        }
+        if (option.action === 'pressConference') {
+            this.startPressConference();
+        }
+
         // Apply effects to power centers
         option.effects.forEach(effect => {
             this.updatePowerCenter(effect.center, effect.change, 'Your decision');
@@ -592,7 +920,7 @@ class PresidentGame {
         setTimeout(() => {
             if (this.currentNewsStories.length > 0) {
                 const randomNews = this.currentNewsStories[Math.floor(Math.random() * this.currentNewsStories.length)];
-                this.generateUniversalCrisis(randomNews);
+                this.generateAdaptiveCrisis(randomNews);
             } else {
                 this.generateContextualCrisis();
             }
@@ -619,7 +947,7 @@ class PresidentGame {
                     }).join('')}
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button class="breaking-btn primary" onclick="game.respondToBreakingNews('${story.headline}')">
+                    <button class="breaking-btn primary" onclick="game.respondToBreakingNews('${story.headline.replace(/'/g, "\\'")}')">
                         RESPOND NOW
                     </button>
                     <button class="breaking-btn secondary" onclick="game.dismissBreakingNews()">
@@ -648,7 +976,7 @@ class PresidentGame {
         if (modal) modal.remove();
         
         if (story) {
-            this.generateUniversalCrisis(story);
+            this.generateAdaptiveCrisis(story);
         }
     }
 
@@ -706,7 +1034,7 @@ class PresidentGame {
     loadMockNews() {
         this.currentNewsStories = [
             {
-                headline: 'Congress Debates Infrastructure Bill Worth $2 Trillion',
+                headline: 'Congress Debates $2 Trillion Infrastructure Package',
                 source: 'Reuters',
                 relevance: 0.9,
                 category: 'domestic',
@@ -714,81 +1042,77 @@ class PresidentGame {
                 timestamp: Date.now()
             },
             {
-                headline: 'China Warns Against Taiwan Independence',
+                headline: 'China Conducts Military Exercises Near Taiwan',
                 source: 'CNN',
-                relevance: 0.8,
+                relevance: 0.85,
                 category: 'foreign',
                 affectedCenters: ['military', 'intelligence', 'wallstreet'],
                 timestamp: Date.now()
             },
             {
-                headline: 'Fed Considers Interest Rate Hike Amid Inflation',
+                headline: 'Federal Reserve Signals Interest Rate Changes',
                 source: 'Bloomberg',
-                relevance: 0.7,
+                relevance: 0.8,
                 category: 'economy',
                 affectedCenters: ['wallstreet', 'public', 'industry'],
+                timestamp: Date.now()
+            },
+            {
+                headline: 'Supreme Court to Review Major Healthcare Case',
+                source: 'NPR',
+                relevance: 0.75,
+                category: 'domestic',
+                affectedCenters: ['congress', 'public', 'science'],
+                timestamp: Date.now()
+            },
+            {
+                headline: 'Pentagon Unveils New Defense Strategy',
+                source: 'Defense News',
+                relevance: 0.7,
+                category: 'military',
+                affectedCenters: ['military', 'intelligence', 'congress'],
+                timestamp: Date.now()
+            },
+            {
+                headline: 'Tech Giants Face New Regulation Proposals',
+                source: 'Wall Street Journal',
+                relevance: 0.65,
+                category: 'economy',
+                affectedCenters: ['industry', 'congress', 'wallstreet'],
+                timestamp: Date.now()
+            },
+            {
+                headline: 'Climate Scientists Issue Urgent Warning',
+                source: 'Nature',
+                relevance: 0.6,
+                category: 'domestic',
+                affectedCenters: ['science', 'public', 'industry'],
+                timestamp: Date.now()
+            },
+            {
+                headline: 'Russia Responds to Latest Sanctions Package',
+                source: 'BBC',
+                relevance: 0.75,
+                category: 'foreign',
+                affectedCenters: ['intelligence', 'military', 'congress'],
                 timestamp: Date.now()
             }
         ];
         this.displayNewsTicker();
-        console.log('📦 Using mock news (offline mode)');
+        console.log('📰 Showing initial mock news (8 stories)');
     }
 
-    // ============= EXISTING SYSTEMS (KEPT FOR COMPATIBILITY) =============
+    // ============= EXISTING SYSTEMS =============
 
     generateContextualCrisis() {
         // Fallback crisis generator
-        const crisis = {
-            title: 'Domestic Policy Challenge',
-            description: 'Congress is demanding action on a critical issue.',
-            affectedCenters: ['congress', 'public'],
-            options: this.generateUniversalOptions(
-                { category: 'domestic', headline: 'Policy Challenge' },
-                ['congress', 'public']
-            )
+        const mockStory = {
+            headline: 'Domestic Policy Deadlock in Congress',
+            source: 'Political Wire',
+            category: 'domestic',
+            affectedCenters: ['congress', 'public']
         };
-        this.currentCrisis = crisis;
-        this.displayCrisis();
-    }
-
-    sendTweet() {
-        const input = document.getElementById('tweetInput');
-        const content = input.value;
-
-        if (!content) {
-            this.showNotification('No content!');
-            return;
-        }
-
-        this.history.tweets.push({
-            content,
-            timestamp: Date.now()
-        });
-
-        const hotWords = ['fake', 'disaster', 'tremendous', 'witch hunt', 'enemy', 'failing'];
-        let tweetChaos = 5;
-        hotWords.forEach(word => {
-            if (content.toLowerCase().includes(word)) {
-                tweetChaos += 10;
-            }
-        });
-
-        // Affect power centers
-        if (content.toLowerCase().includes('media') || content.toLowerCase().includes('fake news')) {
-            this.updatePowerCenter('media', -15, 'Your tweet');
-        }
-        if (content.toLowerCase().includes('congress')) {
-            this.updatePowerCenter('congress', -10, 'Your tweet');
-        }
-        
-        this.updatePowerCenter('public', tweetChaos > 15 ? 10 : 5, 'Your tweet');
-
-        this.chaos = Math.min(100, this.chaos + tweetChaos);
-        this.score += tweetChaos * 10;
-
-        input.value = '';
-        this.showNotification(`Tweet sent! Chaos +${tweetChaos}`);
-        this.updateDisplay();
+        this.generateAdaptiveCrisis(mockStory);
     }
 
     gameLoop() {
@@ -807,7 +1131,6 @@ class PresidentGame {
     }
 
     initiatePhoneCall(caller) {
-        // Simplified phone call system
         this.showNotification(`📞 ${caller.name} is calling...`);
     }
 
@@ -908,136 +1231,7 @@ class PresidentGame {
 
         setTimeout(() => notif.remove(), 3000);
     }
-
-    triggerDopamineHit(text) {
-        const burst = document.createElement('div');
-        burst.className = 'dopamine-burst';
-        burst.textContent = text;
-        document.body.appendChild(burst);
-
-        setTimeout(() => burst.remove(), 1000);
-    }
-
-    async generateAINarrative(newsStory, generationType) {
-        if (this.aiCallsToday >= this.maxFreeAICalls) {
-            this.showNotification('Upgrade to Premium for unlimited AI crises!');
-            this.generateFallbackCrisis(newsStory);
-            return;
-        }
-        this.aiCallsToday++;
-        try {
-            const response = await fetch('/api/ai-narrative', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerContext: {
-                        history: this.history,
-                        relationships: this.relationships,
-                        decisions: this.history.decisions
-                    },
-                    newsHeadline: newsStory.headline,
-                    generationType
-                })
-            });
-            const data = await response.json();
-            if (data.success) {
-                this.applyNarrative(data.narrative, generationType);
-                this.showNotification(`AI Crisis: ${data.narrative.headline || data.narrative.event}`);
-            } else {
-                this.generateFallbackCrisis(newsStory);
-            }
-        } catch (error) {
-            console.error('AI Narrative Fetch Error:', error);
-            this.generateFallbackCrisis(newsStory);
-        }
-    }
-
-    applyNarrative(narrative, generationType) {
-        if (generationType === 'scandal') {
-            this.chaos += narrative.impacts.chaos || 0;
-            this.energy += narrative.impacts.energy || 0;
-            this.score += narrative.impacts.score || 0;
-            narrative.impacts.relationships.forEach(rel => {
-                const target = this.relationships.find(r => r.name === rel.name);
-                if (target) {
-                    target.trust = Math.max(0, Math.min(100, target.trust + (rel.trust || 0)));
-                    target.respect = Math.max(0, Math.min(100, target.respect + (rel.respect || 0)));
-                    target.fear = Math.max(0, Math.min(100, target.fear + (rel.fear || 0)));
-                }
-            });
-            this.history.scandals.push(narrative);
-        } else if (generationType === 'diplomaticTwist') {
-            this.currentCrisis = {
-                event: narrative.event,
-                options: narrative.options,
-                outcomes: narrative.outcomes
-            };
-            this.updateCrisisPanel();
-        }
-        this.updateDisplay();
-        this.displayRelationships();
-    }
-
-    generateFallbackCrisis(newsStory) {
-        const crisis = {
-            headline: `Fallback: ${newsStory.headline}`,
-            description: 'A generic crisis based on news.',
-            impacts: { chaos: 10, energy: -5, score: -10, relationships: [] }
-        };
-        this.applyNarrative(crisis, 'scandal');
-    }
-
-    async generateNewsBasedCrisis(topStory) {
-        if (Math.random() < 0.5) {
-            await this.generateAINarrative(topStory, 'scandal');
-        } else {
-            await this.generateAINarrative(topStory, 'diplomaticTwist');
-        }
-    }
-
-    updateCrisisPanel() {
-        const panel = document.getElementById('crisisPanel');
-        if (this.currentCrisis) {
-            panel.innerHTML = `
-                <h3>${this.currentCrisis.event}</h3>
-                <div class="crisis-options">
-                    ${this.currentCrisis.options.map((opt, i) => `
-                        <button class="response-btn" onclick="game.handleCrisisOption(${i})">${opt}</button>
-                    `).join('')}
-                </div>
-                <button class="response-btn" onclick="game.startPressConference()">Hold Press Conference</button>
-            `;
-        } else {
-            panel.innerHTML = `
-                <h3>Crisis Loading...</h3>
-                <p>Preparing situation...</p>
-                <button class="response-btn" onclick="game.startPressConference()">Hold Press Conference</button>
-            `;
-        }
-    }
-
-    handleCrisisOption(index) {
-        const outcome = this.currentCrisis.outcomes[index];
-        this.chaos += outcome.chaos || 0;
-        this.energy += outcome.energy || 0;
-        this.score += outcome.score || 0;
-        outcome.relationships.forEach(rel => {
-            const target = this.relationships.find(r => r.name === rel.name);
-            if (target) {
-                target.trust = Math.max(0, Math.min(100, target.trust + (rel.trust || 0)));
-                target.respect = Math.max(0, Math.min(100, target.respect + (rel.respect || 0)));
-                target.fear = Math.max(0, Math.min(100, target.fear + (rel.fear || 0)));
-            }
-        });
-        this.history.decisions.push({ event: this.currentCrisis.event, option: this.currentCrisis.options[index], outcome });
-        this.showNotification(`Decision made: ${outcome.chaos > 0 ? 'Chaos rises!' : 'Situation stabilized!'}`);
-        this.currentCrisis = null;
-        this.updateDisplay();
-        this.displayRelationships();
-        this.updateCrisisPanel();
-    }
 }
 
-console.log('President Simulator - Total Chaos Edition loaded successfully');
-
+console.log('President Simulator - Smart Twitter Edition loaded');
 window.startPresidency = startPresidency;
