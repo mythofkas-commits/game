@@ -381,6 +381,13 @@ class PresidentGame {
         try {
             resp = await attempt();
         } catch (err) {
+            if (typeof this.debugTrace === 'function') {
+                this.debugTrace('AI narrative fetch failed (first attempt)', { error: String(err) });
+            } else {
+                console.debug('AI narrative fetch failed (first attempt):', err);
+            }
+            // Exponential backoff: wait 500ms before retrying
+            await new Promise(resolve => setTimeout(resolve, 500));
             resp = await attempt();
         }
 
