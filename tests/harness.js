@@ -29,10 +29,20 @@ async function waitFor(doc, sel, ms=5000){
 
   const btn = await waitFor(doc, '[data-testid="decision-btn"]');
   btn.click();
-  await sleep(100);
-
-  const postChaos = win.game.chaos;
-  const postEnergy = win.game.energy;
+  // Wait for either chaos or energy to change, up to 5 seconds
+  const timeout = 5000;
+  const pollInterval = 50;
+  const startTime = performance.now();
+  let postChaos, postEnergy;
+  for (;;) {
+    postChaos = win.game.chaos;
+    postEnergy = win.game.energy;
+    if (postChaos !== preChaos || postEnergy !== preEnergy) break;
+    if (performance.now() - startTime > timeout) {
+      throw new Error('Timeout waiting for decision to change state');
+    }
+    await sleep(pollInterval);
+  }
   assert(postChaos !== preChaos || postEnergy !== preEnergy, 'Decision produced no state change');
 
   document.body.dataset.pass = '1';
