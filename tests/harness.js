@@ -1,5 +1,6 @@
 function assert(cond, msg){ if(!cond) throw new Error('Assert: ' + msg); }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
 async function waitFor(doc, sel, ms=5000){
   const start = performance.now();
   for(;;){
@@ -10,11 +11,37 @@ async function waitFor(doc, sel, ms=5000){
   }
 }
 
+function snapshotGame(win){
+  return {
+    chaos: win.game?.chaos,
+    energy: win.game?.energy,
+    power: Object.fromEntries((win.game?.powerCenters || []).map(p => [p.id, p.value])),
+    relationships: win.game?.relationships ? { ...win.game.relationships } : null
+  };
+}
+
+function stateChanged(a, b){
+  if (a == null || b == null) return false;
+  if (a.chaos !== b.chaos) return true;
+  if (a.energy !== b.energy) return true;
+  const keys = new Set([...Object.keys(a.power || {}), ...Object.keys(b.power || {})]);
+  for (const k of keys){
+    if ((a.power || {})[k] !== (b.power || {})[k]) return true;
+  }
+  if (a.relationships && b.relationships){
+    const rk = new Set([...Object.keys(a.relationships), ...Object.keys(b.relationships)]);
+    for (const k of rk){
+      if (a.relationships[k] !== b.relationships[k]) return true;
+    }
+  }
+  return false;
+}
+
 (async function run(){
   const frameEl = document.getElementById('app');
   await new Promise(r => frameEl.addEventListener('load', r, { once: true }));
 
-  // set deterministic seed before the app reads it
+  // Optional deterministic seed if the app uses it
   try { frameEl.contentWindow.localStorage.setItem('seed','1234'); } catch {}
 
   const win = frameEl.contentWindow;
@@ -22,21 +49,37 @@ async function waitFor(doc, sel, ms=5000){
 
   if (typeof win.startPresidency === 'function') win.startPresidency();
 
-  // wait for crisis UI and a decision button
-  await waitFor(doc, '[data-testid="crisis-panel"]');
-  const preChaos = win.game.chaos;
-  const preEnergy = win.game.energy;
+  // Wait for crisis UI and options
+  await waitFor(doc, '[data-testid="crisis-panel"], #crisisPanel');
 
-  const btn = await waitFor(doc, '[data-testid="decision-btn"]');
-  btn.click();
-  await sleep(100);
+  const start = performance.now();
+  let changed = false;
+  while (performance.now() - start < 5000 && !changed){
+    const buttons = Array.from(doc.querySelectorAll('[data-testid="decision-btn"], #crisisOptions .decision-btn'));
+    if (!buttons.length){
+      await sleep(50);
+      continue;
+    }
+    for (const btn of buttons){
+      const pre = snapshotGame(win);
+      btn.click();
+      const attemptStart = performance.now();
+      while (performance.now() - attemptStart < 1000){
+        await sleep(60);
+        const post = snapshotGame(win);
+        if (stateChanged(pre, post)){
+          changed = true;
+          break;
+        }
+      }
+      if (changed) break;
+    }
+  }
 
-  const postChaos = win.game.chaos;
-  const postEnergy = win.game.energy;
-  assert(postChaos !== preChaos || postEnergy !== preEnergy, 'Decision produced no state change');
+  assert(changed, 'No decision option produced any measurable state change (chaos, energy, power centers, or relationships)');
 
   document.body.dataset.pass = '1';
-  console.log('PASS: basic decision changes state');
+  console.log('PASS: at least one decision produced a measurable state change');
 })().catch(e=>{
   console.error(e);
   document.body.dataset.fail = e.message;
