@@ -1,4 +1,4 @@
-# President Simulator: Total Chaos Edition
+# Chaos Potus — A News-Driven Political Strategy Game
 
 A real-time political simulation game with live news integration, relationship management, and crisis decision-making.
 
@@ -15,18 +15,6 @@ A real-time political simulation game with live news integration, relationship m
 - **Scandal Management**: Contain spreading scandals through strategic damage control
 
 ## Deployment
-
-### Vercel Deployment (Recommended)
-
-1. Deploy to Vercel:
-   ```bash
-   vercel --prod
-   ```
-
-2. Set environment variables in Vercel dashboard:
-   - `NEWS_API_KEY`: Get from https://newsapi.org/
-
-3. The game will automatically fall back to mock news if API key is not available.
 
 ### Local Development
 
