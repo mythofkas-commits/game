@@ -372,24 +372,14 @@ class PresidentGame {
         try {
             resp = await attempt();
         } catch (err) {
+            // Log the error once
             if (typeof this.debugTrace === 'function') {
-                this.debugTrace('AI narrative fetch failed (first attempt)', { error: String(err) });
-            } else {
-                console.debug('AI narrative fetch failed (first attempt):', err);
-            }
-            // Exponential backoff: wait 500ms before retrying
-            await new Promise(resolve => setTimeout(resolve, 500));
-            if (typeof this.debugTrace === 'function') {
-                this.debugTrace('AI narrative fetch failed (first attempt)', { error: String(err) });
+                this.debugTrace('AI narrative fetch failed (first attempt)', { error: String(err), stack: err?.stack });
             } else {
                 console.debug('AI narrative fetch failed (first attempt):', err);
             }
             // Backoff: wait 500ms before retrying
             await new Promise(resolve => setTimeout(resolve, 500));
-            // Log the first error at debug level
-            if (typeof this.debugTrace === 'function') {
-                this.debugTrace('AI narrative fetch error (first attempt)', { error: String(err), stack: err?.stack });
-            }
             // Check if error is transient (network or 5xx)
             let shouldRetry = false;
             if (err && typeof err === 'object') {
