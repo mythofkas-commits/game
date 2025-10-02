@@ -515,22 +515,50 @@ class PresidentGame {
 
         if (this.debug) this.installDebugOverlay();
 
-        const origHandleDecision = this.handleDecision.bind(this);
-        this.handleDecision = (option) => {
-            const before = this.snapshotState();
-            this.debugTrace('handleDecision:before', { option });
-            try {
-                return origHandleDecision(option);
-            } finally {
-                const after = this.snapshotState();
-                const delta = this.diffStates(before, after);
-                if (!Object.keys(delta).length) {
-                    this.debugTrace('no effect detected', { option, state: after });
-                } else {
-                    this.debugTrace('handleDecision:after', delta);
+        const origHandleDecision = this.handleDecision?.bind(this);
+        if (origHandleDecision) {
+            this.handleDecision = (option) => {
+                const before = this.snapshotState ? this.snapshotState() : {
+                    chaos: this.chaos,
+                    energy: this.energy,
+                    power: Object.fromEntries((this.powerCenters || []).map(p => [p.id, p.value]))
+                };
+                this.debugTrace && this.debugTrace('decision:before', { option });
+                try { return origHandleDecision(option); }
+                finally {
+                    const after = this.snapshotState ? this.snapshotState() : {
+                        chaos: this.chaos,
+                        energy: this.energy,
+                        power: Object.fromEntries((this.powerCenters || []).map(p => [p.id, p.value]))
+                    };
+                    const power = {};
+                    const keys = new Set([
+                        ...Object.keys(before.power || {}),
+                        ...Object.keys(after.power || {})
+                    ]);
+                    for (const k of keys) {
+                        if ((before.power || {})[k] !== (after.power || {})[k]) {
+                            power[k] = [(before.power || {})[k], (after.power || {})[k]];
+                        }
+                    }
+                    const delta = {};
+                    if (before.chaos !== after.chaos) delta.chaos = [before.chaos, after.chaos];
+                    if (before.energy !== after.energy) delta.energy = [before.energy, after.energy];
+                    if (Object.keys(power).length) delta.power = power;
+
+                    if (!Object.keys(delta).length) {
+                        this.debugTrace && this.debugTrace('no effect detected', {
+                            option,
+                            chaos: after.chaos,
+                            energy: after.energy,
+                            centers: after.power
+                        });
+                    } else {
+                        this.debugTrace && this.debugTrace('decision:after', delta);
+                    }
                 }
-            }
-        };
+            };
+        }
     }
 
     showLoadingError() {
