@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Harness</title>
+<body>
+<iframe id="app" src="../index.html?debug=1" style="width:1200px;height:800px;border:1px solid #444"></iframe>
+<script src="harness.js"></script>
+<style>
+  #h-status{position:fixed;top:8px;right:8px;padding:8px 12px;font:600 14px system-ui;border:1px solid #333;background:#111;color:#ddd;z-index:99999}
+  #h-status.pass{background:#0b3; color:#fff; border-color:#0a2}
+  #h-status.fail{background:#b00; color:#fff; border-color:#700}
+</style>
+<div id="h-status">Running…</div>
+<script>
+  const s = document.getElementById('h-status');
+  const tick = () => {
+    if (document.body.dataset.pass === "1"){ s.textContent = "PASS"; s.className = "pass"; }
+    else if (document.body.dataset.fail){ s.textContent = "FAIL: " + document.body.dataset.fail; s.className = "fail"; }
+    else { s.textContent = "Running…"; s.className = ""; }
+    requestAnimationFrame(tick);
+  };
+  tick();
+</script>
+</body>
