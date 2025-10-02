@@ -163,7 +163,7 @@ class PresidentGame {
 
         // Analytics tracking
         const randomId = this.debug ? this.rand() : Math.random();
-        this.sessionId = Date.now() + '-' + randomId.toString(36).substring(2, 11);
+        this.sessionId = Date.now() + '-' + randomId.toString(36).substring(2, 11).padStart(9, '0');
         this.sessionStart = Date.now();
         this.analytics = {
             events: [],
