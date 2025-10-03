@@ -477,6 +477,65 @@ class PresidentGame {
 
     async fetchJson(url, init) {
         if (this.debug && url.includes('/api/ai-narrative')) {
+            let payload = {};
+            try {
+                payload = JSON.parse(init?.body || '{}');
+            } catch {
+                payload = {};
+            }
+
+            if (payload.generationType === 'crisis_options') {
+                return {
+                    narrative: {
+                        options: [
+                            {
+                                text: '🚢 Deploy naval drill',
+                                effects: {
+                                    relationships: [
+                                        { center: 'military', change: 12 },
+                                        { center: 'wallstreet', change: -8 }
+                                    ]
+                                },
+                                chaos: 18,
+                                energy: 20
+                            },
+                            {
+                                text: '🤝 Urgent summit with allies',
+                                effects: {
+                                    relationships: [
+                                        { center: 'congress', change: 10 },
+                                        { center: 'media', change: 8 }
+                                    ]
+                                },
+                                chaos: -4,
+                                energy: 18
+                            },
+                            {
+                                text: '🐦 Tweet reassurance to public',
+                                effects: {
+                                    relationships: [
+                                        { center: 'public', change: 9 },
+                                        { center: 'media', change: -6 }
+                                    ]
+                                },
+                                chaos: 12,
+                                energy: 6
+                            },
+                            {
+                                text: '⚙️ Mobilize industry task force',
+                                effects: {
+                                    relationships: [
+                                        { center: 'industry', change: 11 }
+                                    ]
+                                },
+                                chaos: 6,
+                                energy: 15
+                            }
+                        ]
+                    }
+                };
+            }
+
             return {
                 narrative: {
                     headline: 'Test Narrative',
@@ -527,8 +586,12 @@ class PresidentGame {
 
         if (!resp || !resp.narrative) throw new Error('Bad AI payload');
 
+        if (generationType === 'crisis_options') {
+            return resp;
+        }
+
         const n = resp.narrative;
-        const impacts = n.impacts || n.impact || {};
+        const impacts = n?.impacts || n?.impact || {};
         const toNum = value => {
             const num = Number(value);
             return Number.isFinite(num) ? num : NaN;
@@ -543,45 +606,13 @@ class PresidentGame {
             relationships = Object.entries(relationships).map(([center, change]) => ({ center, change }));
         }
 
-        return {
-            title: n.headline || n.title || 'Policy Response',
+        resp.narrative = {
+            headline: n.headline || n.title || 'Policy Response',
             description: n.description || n.body || '',
             impacts: { chaos, energy, relationships }
         };
-    }
 
-    translateAINarrativeToOption(ai) {
-        const known = this.knownPowerCentersSet();
-        const rel = Array.isArray(ai.impacts.relationships) ? ai.impacts.relationships : [];
-        const effects = [];
-        const unknowns = [];
-        for (const entry of rel) {
-            if (!entry || typeof entry.center !== 'string') continue;
-            const trimmed = String(entry.center).trim();
-            if (!trimmed) continue;
-            const centerId = trimmed.toLowerCase();
-            const change = Number(entry.change || 0);
-            if (!Number.isFinite(change) || change === 0) continue;
-            if (known.has(centerId)) {
-                effects.push({ center: centerId, change });
-            } else {
-                unknowns.push(trimmed);
-            }
-        }
-        if (unknowns.length) console.warn('AI returned unknown centers:', unknowns);
-
-        const chaosValue = Number(ai.impacts.chaos || 0);
-        const chaos = Number.isFinite(chaosValue) ? chaosValue : 0;
-        const energyRaw = Number(ai.impacts.energy || 0);
-        const energy = Number.isFinite(energyRaw) && energyRaw !== 0 ? Math.abs(energyRaw) : 8;
-        const text = typeof ai.title === 'string' && ai.title.trim() ? ai.title.trim() : 'AI Response';
-
-        return {
-            text,
-            effects,
-            chaos,
-            energy
-        };
+        return resp;
     }
 
     assert(cond, msg) {
@@ -1169,6 +1200,13 @@ class PresidentGame {
             if (text.includes(keyword)) criticalMatches++;
         });
 
+
+        const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
+        let criticalMatches = 0;
+        criticalKeywords.forEach(keyword => {
+            if (text.includes(keyword)) criticalMatches++;
+        });
+
         if (criticalMatches >= 2) {
             score = 0.8;
         } else if (criticalMatches === 1) {
@@ -1426,135 +1464,140 @@ class PresidentGame {
 
     async generateAdaptiveCrisis(story) {
         try {
-            const headline = (story && story.headline) || 'Developing situation';
-            const desc = (story && story.description) || 'Urgent developments require a response.';
-            const category = (story && story.category) || 'domestic';
-            const lower = headline.toLowerCase();
-            const generationType =
-                (lower.includes('scandal') || lower.includes('probe') || lower.includes('leak') || category === 'domestic')
-                    ? 'scandal'
-                    : 'diplomaticTwist';
+            const headline = story?.headline || 'Developing situation';
+            const category = story?.category || 'domestic';
 
-            const resolveAffectedCenters = () => {
-                if (Array.isArray(story?.affectedCenters) && story.affectedCenters.length > 0) {
-                    return story.affectedCenters;
-                }
-                if (typeof this.identifyAffectedCenters === 'function') {
-                    const inferred = this.identifyAffectedCenters(headline, desc);
-                    if (Array.isArray(inferred) && inferred.length) {
-                        return inferred;
-                    }
-                }
-                return this.guessAffectedCenters(category);
-            };
+            const identified = Array.isArray(story?.affectedCenters) && story.affectedCenters.length > 0
+                ? story.affectedCenters
+                : this.identifyAffectedCenters(headline, story?.description || '') || [];
+            const affectedCenters = identified.length > 0
+                ? identified
+                : this.guessAffectedCenters(category);
 
-            const buildHandcrafted = () => {
-                const affectedCenters = resolveAffectedCenters();
-                return {
-                    newsStory: story,
-                    title: `URGENT: ${headline}`,
-                    description: this.generateCrisisDescription(story, affectedCenters),
-                    affectedCenters,
-                    options: this.generateAdaptiveOptions(story, affectedCenters)
-                };
-            };
-
-            let aiOption = null;
-            let aiValid = false;
-            try {
-                const ai = await this.fetchAINarrative({ headline, generationType });
-                aiOption = this.translateAINarrativeToOption(ai);
-                aiValid = (Array.isArray(aiOption.effects) && aiOption.effects.length > 0)
-                    || (aiOption.chaos !== 0 || aiOption.energy !== 0);
-                this.aiSchemaPassStreak = aiValid ? this.aiSchemaPassStreak + 1 : 0;
-            } catch (err) {
-                console.warn('AI narrative error (shadow):', err);
-                this.aiSchemaPassStreak = 0;
-            }
-
-            const ready = this.aiReady();
-            let crisis = null;
             let usedAI = false;
-
-            if (ready && aiValid) {
-                const affectedCenters = resolveAffectedCenters();
-                crisis = {
-                    newsStory: story,
-                    title: `URGENT: ${headline}`,
-                    description: this.generateCrisisDescription(story, affectedCenters),
-                    affectedCenters,
-                    options: [aiOption]
-                };
+            let options = await this.generateAICrisisOptions(headline);
+            if (Array.isArray(options) && options.length >= 3) {
                 usedAI = true;
                 this.aiUsed = true;
             } else {
-                crisis = buildHandcrafted();
-                if ((!crisis.options || crisis.options.length === 0) && aiValid) {
-                    const fallbackCenters = resolveAffectedCenters();
-                    crisis = {
-                        newsStory: story,
-                        title: `URGENT: ${headline}`,
-                        description: this.generateCrisisDescription(story, fallbackCenters),
-                        affectedCenters: fallbackCenters,
-                        options: [aiOption]
-                    };
-                    usedAI = true;
-                    this.aiUsed = true;
-                }
+                console.log('⚠️ Using handcrafted options');
+                options = this.generateHandcraftedOptions(story, affectedCenters);
             }
 
-            if (!crisis) return;
+            this.currentCrisis = {
+                newsStory: story,
+                title: `URGENT: ${headline}`,
+                description: this.generateCrisisDescription(story, affectedCenters),
+                affectedCenters,
+                options
+            };
 
             this.aiShadowMode = !usedAI;
 
-            this.currentCrisis = crisis;
-            if (typeof this.displayCrisis === 'function') {
-                this.displayCrisis();
-            }
+            this.displayCrisis();
 
-            const eventData = {
+            this.trackEvent('crisis_generated', {
                 headline,
                 category,
-                affectedCenters: crisis.affectedCenters,
+                affectedCenters,
                 source: story?.source || 'news',
-                usedAI,
-                aiSchemaPassStreak: this.aiSchemaPassStreak
-            };
-            if (typeof this.trackEvent === 'function') {
-                this.trackEvent('crisis_generated', eventData);
-            }
+                usedAI
+            });
         } catch (err) {
-            console.error('generateAdaptiveCrisis error:', err);
+            console.error('Crisis generation error:', err);
+            this.currentCrisis = {
+                newsStory: story,
+                title: 'URGENT: Crisis Requires Response',
+                description: 'Immediate action needed',
+                affectedCenters: ['congress', 'public'],
+                options: this.generateHandcraftedOptions(story, ['congress', 'public'])
+            };
+            this.displayCrisis();
         }
     }
 
-    guessAffectedCenters(category) {
-        const mapping = {
-            foreign: ['military', 'intelligence', 'congress'],
-            economy: ['wallstreet', 'industry', 'public'],
-            scandal: ['media', 'public', 'congress'],
-            military: ['military', 'intelligence', 'congress'],
-            healthcare: ['science', 'public', 'industry'],
-            domestic: ['congress', 'public', 'media']
-        };
-        return mapping[category] || ['public', 'media'];
-    }
+    async generateAICrisisOptions(headline) {
+        try {
+            console.log('🤖 Requesting AI options for:', headline);
 
-    generateCrisisDescription(story, affectedCenters) {
-        const centerNames = affectedCenters.map(id => {
-            const center = this.powerCenters.find(p => p.id === id);
-            return center ? `${center.icon} ${center.name}` : '';
-        }).filter(n => n).join(', ');
+            const aiResponse = await this.fetchAINarrative({
+                headline,
+                generationType: 'crisis_options'
+            });
 
+            if (!aiResponse?.narrative?.options || !Array.isArray(aiResponse.narrative.options)) {
+                throw new Error('Bad AI response structure');
+            }
+
+            const known = this.knownPowerCentersSet();
+            const gameOptions = [];
+
+            for (const aiOpt of aiResponse.narrative.options) {
+                const effects = [];
+                const rels = aiOpt.effects?.relationships || [];
+
+                for (const rel of rels) {
+                    if (!rel?.center) continue;
+                    const centerId = String(rel.center).toLowerCase().trim();
+                    const change = Number(rel.change);
+                    if (!known.has(centerId) || !Number.isFinite(change) || change === 0) continue;
+                    effects.push({ center: centerId, change });
+                }
+
+                const chaos = Number.isFinite(aiOpt.chaos) ? aiOpt.chaos : 10;
+                const rawEnergy = Number(aiOpt.energy);
+                const energy = Number.isFinite(rawEnergy) && rawEnergy !== 0 ? Math.abs(rawEnergy) : 15;
+                const text = aiOpt.text?.trim() || 'AI Response';
+
+                if (text && text !== 'AI Response') {
+                    gameOptions.push({ text, effects, chaos, energy });
+                }
+            }
+
+            console.log(`✅ Converted ${gameOptions.length} AI options`);
+            return gameOptions;
+        } catch (err) {
+            console.warn('AI generation failed:', err);
+            return null;
+        }
         const safeSource = this.sanitizeText(story.source);
         return `${safeSource} reports this breaking development. Your response will impact: ${centerNames}`;
     }
 
-    generateAdaptiveOptions(story, affectedCenters) {
+    generateHandcraftedOptions(story, affectedCenters) {
+        const centers = Array.isArray(affectedCenters) && affectedCenters.length
+            ? affectedCenters
+            : ['public', 'media'];
+        const rawHeadline = this.sanitizeText(story?.headline || '');
+        const headline = rawHeadline.toLowerCase();
         const options = [];
-        const category = story.category || 'domestic';
-        const headline = (story.headline || '').toLowerCase();
 
+        const hasChina = headline.includes('china') || headline.includes('xi');
+        const hasRussia = headline.includes('russia') || headline.includes('putin');
+        const hasMarkets = headline.includes('market') || headline.includes('stock');
+        const hasScandal = headline.includes('scandal') || headline.includes('investigation');
+
+        if (hasChina) {
+            options.push({
+                text: `🚢 Deploy carrier group to South China Sea`,
+                effects: [
+                    { center: 'military', change: 18 },
+                    { center: 'wallstreet', change: -15 },
+                    { center: 'intelligence', change: 10 }
+                ],
+                chaos: 25,
+                energy: 25
+            });
+        } else if (hasRussia) {
+            options.push({
+                text: `💣 Authorize lethal aid shipment`,
+                effects: [
+                    { center: 'military', change: 15 },
+                    { center: 'congress', change: -10 },
+                    { center: 'intelligence', change: 12 }
+                ],
+                chaos: 22,
+                energy: 25
         const extractKeyTopic = (text) => {
             const h = text.toLowerCase();
             if (h.includes('china') || h.includes('xi')) return 'China';
@@ -1617,8 +1660,13 @@ class PresidentGame {
                 chaos: 12,
                 energy: 20
             });
-        } else if (category === 'scandal') {
+        } else if (hasScandal) {
             options.push({
+                text: `🔥 Call accusers "fake news" on Twitter`,
+                effects: [
+                    { center: 'media', change: -18 },
+                    { center: 'public', change: 12 }
+                ],
                 text: `⚔️ Attack accusers over "${shortHeadline}..."`,
                 effects: affectedCenters.map(id => {
                     if (id === 'media') return { center: id, change: -20 };
@@ -1631,6 +1679,8 @@ class PresidentGame {
             });
         } else {
             options.push({
+                text: `📞 Convene National Security Council`,
+                effects: centers.map(id => ({ center: id, change: 10 })),
                 text: `💪 Take decisive action on "${shortHeadline}..."`,
                 effects: affectedCenters.map(id => {
                     if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
@@ -1643,6 +1693,16 @@ class PresidentGame {
             });
         }
 
+        if (hasChina) {
+            options.push({
+                text: `📞 Request emergency call with Xi Jinping`,
+                effects: [
+                    { center: 'congress', change: 10 },
+                    { center: 'intelligence', change: 12 },
+                    { center: 'military', change: -8 }
+                ],
+                chaos: 5,
+                energy: 20
         if (category === 'foreign') {
             options.push({
                 text: `🤝 Seek diplomatic solution with ${keyTopic}`,
@@ -1655,8 +1715,15 @@ class PresidentGame {
                 chaos: -5,
                 energy: 15
             });
-        } else if (category === 'economy') {
+        } else if (hasMarkets) {
             options.push({
+                text: `📊 Work with Fed on interest rate strategy`,
+                effects: [
+                    { center: 'wallstreet', change: 10 },
+                    { center: 'industry', change: 8 }
+                ],
+                chaos: -5,
+                energy: 15
                 text: `📋 Form bipartisan commission on ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'congress') return { center: id, change: 15 };
@@ -1680,6 +1747,11 @@ class PresidentGame {
             });
         } else {
             options.push({
+                text: `🏛️ Form bipartisan commission to investigate`,
+                effects: [
+                    { center: 'congress', change: 12 },
+                    { center: 'media', change: 8 }
+                ],
                 text: `🤝 Take measured approach to ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'congress') return { center: id, change: 10 };
@@ -1688,11 +1760,16 @@ class PresidentGame {
                     return { center: id, change: 5 };
                 }),
                 chaos: -5,
-                energy: 10
+                energy: 15
             });
         }
 
         options.push({
+            text: `🐦 Tweet about it (focus Twitter)`,
+            effects: [
+                { center: 'public', change: 12 },
+                { center: 'media', change: -10 }
+            ],
             text: `🐦 Tweet storm about ${keyTopic}`,
             effects: affectedCenters.map(id => {
                 if (id === 'public') return { center: id, change: 12 };
@@ -1703,6 +1780,40 @@ class PresidentGame {
             energy: 5,
             action: 'focusTwitter'
         });
+
+        if (hasMarkets) {
+            options.push({
+                text: `🏦 Propose emergency economic relief package`,
+                effects: [
+                    { center: 'wallstreet', change: 15 },
+                    { center: 'public', change: 12 },
+                    { center: 'congress', change: -10 }
+                ],
+                chaos: 12,
+                energy: 25
+            });
+        } else if (hasScandal) {
+            options.push({
+                text: `🎤 Schedule prime-time press conference`,
+                effects: [
+                    { center: 'media', change: 12 },
+                    { center: 'public', change: 8 }
+                ],
+                chaos: 10,
+                energy: 20,
+                action: 'pressConference'
+            });
+        } else {
+            options.push({
+                text: `⚡ Issue executive order addressing situation`,
+                effects: centers.map(id => ({
+                    center: id,
+                    change: id === 'congress' ? -8 : 10
+                })),
+                chaos: 18,
+                energy: 20
+            });
+        }
 
         if (category === 'scandal') {
             options.push({
@@ -1744,6 +1855,28 @@ class PresidentGame {
 
         console.log(`✅ Generated ${options.length} SPECIFIC options for ${keyTopic}`);
         return options;
+    }
+
+    guessAffectedCenters(category) {
+        const mapping = {
+            foreign: ['military', 'intelligence', 'congress'],
+            economy: ['wallstreet', 'industry', 'public'],
+            scandal: ['media', 'public', 'congress'],
+            military: ['military', 'intelligence', 'congress'],
+            healthcare: ['science', 'public', 'industry'],
+            domestic: ['congress', 'public', 'media']
+        };
+        return mapping[category] || ['public', 'media'];
+    }
+
+    generateCrisisDescription(story, affectedCenters) {
+        const centerNames = affectedCenters.map(id => {
+            const center = this.powerCenters.find(p => p.id === id);
+            return center ? `${center.icon} ${center.name}` : '';
+        }).filter(n => n).join(', ');
+
+        const safeSource = this.sanitizeText(story?.source || 'News Source');
+        return `${safeSource} reports this breaking development. Your response will impact: ${centerNames}`;
     }
 
     displayCrisis() {
