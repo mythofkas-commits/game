@@ -174,6 +174,33 @@ class PresidentGame {
         };
     }
 
+    /**
+     * Sanitize user-provided or external text to prevent XSS.
+     * @param {string} input
+     * @returns {string}
+     */
+    sanitizeText(input) {
+        if (typeof input !== 'string') return '';
+
+        const temp = document.createElement('div');
+        temp.textContent = input;
+        const decoded = temp.innerHTML;
+
+        return decoded.replace(/<[^>]*>/g, '');
+    }
+
+    /**
+     * Safely set text content on an element resolved by selector or id.
+     * @param {string} selector
+     * @param {string|number} text
+     */
+    safeSetText(selector, text) {
+        const el = document.getElementById(selector) || document.querySelector(selector);
+        if (el) {
+            el.textContent = typeof text === 'string' ? text : String(text ?? '');
+        }
+    }
+
     // ============= ANALYTICS TRACKING =============
 
     trackEvent(eventType, data = {}) {
@@ -680,10 +707,17 @@ class PresidentGame {
     showPowerChangeNotification(center, change, reason) {
         const notif = document.createElement('div');
         notif.className = 'power-notification';
-        notif.innerHTML = `
-            ${center.icon} ${center.name}: ${change > 0 ? '+' : ''}${Math.round(change)}
-            ${reason ? `<div style="font-size: 11px; opacity: 0.8;">${reason}</div>` : ''}
-        `;
+        const main = document.createElement('span');
+        main.textContent = `${center.icon} ${center.name}: ${change > 0 ? '+' : ''}${Math.round(change)}`;
+        notif.appendChild(main);
+
+        if (reason) {
+            const detail = document.createElement('div');
+            detail.style.fontSize = '11px';
+            detail.style.opacity = '0.8';
+            detail.textContent = this.sanitizeText(reason);
+            notif.appendChild(detail);
+        }
         document.getElementById('powerNotifications').appendChild(notif);
 
         setTimeout(() => notif.remove(), 3000);
@@ -948,13 +982,21 @@ class PresidentGame {
         const feedback = document.createElement('div');
         feedback.className = 'tweet-feedback';
         
-        let feedbackHTML = `<strong>Tweet Analysis:</strong><br>`;
-        feedbackHTML += `Tone: ${analysis.tone.toUpperCase()} | Chaos: +${analysis.chaos}<br>`;
-        
+        const header = document.createElement('strong');
+        header.textContent = 'Tweet Analysis:';
+        feedback.appendChild(header);
+        feedback.appendChild(document.createElement('br'));
+
+        const toneLine = document.createTextNode(`Tone: ${analysis.tone.toUpperCase()} | Chaos: +${analysis.chaos}`);
+        feedback.appendChild(toneLine);
+        feedback.appendChild(document.createElement('br'));
+
         if (analysis.warnings.length > 0) {
-            feedbackHTML += `⚠️ ${analysis.warnings.join(' ')}<br>`;
+            const warnLine = document.createTextNode(`⚠️ ${analysis.warnings.join(' ')}`);
+            feedback.appendChild(warnLine);
+            feedback.appendChild(document.createElement('br'));
         }
-        
+
         const significantEffects = Object.entries(analysis.powerEffects)
             .filter(([_, val]) => Math.abs(val) >= 5)
             .map(([center, val]) => {
@@ -962,12 +1004,12 @@ class PresidentGame {
                 return c ? `${c.icon} ${val > 0 ? '+' : ''}${val}` : '';
             })
             .filter(s => s);
-        
+
         if (significantEffects.length > 0) {
-            feedbackHTML += `Impact: ${significantEffects.join(', ')}`;
+            const impactLine = document.createTextNode(`Impact: ${significantEffects.join(', ')}`);
+            feedback.appendChild(impactLine);
         }
 
-        feedback.innerHTML = feedbackHTML;
         document.getElementById('tweetFeedback').appendChild(feedback);
 
         setTimeout(() => feedback.remove(), 5000);
@@ -1186,12 +1228,14 @@ class PresidentGame {
         uniqueStories.forEach(story => {
             const item = document.createElement('span');
             item.className = 'news-item';
-            
+
             // Add emoji badge based on relevance
-            const badge = story.relevance > 0.75 ? '🔥' : 
+            const badge = story.relevance > 0.75 ? '🔥' :
                          story.relevance > 0.5 ? '⚡' : '📰';
-            
-            item.innerHTML = `${badge} [${story.source}] ${story.headline}`;
+
+            const safeSource = this.sanitizeText(story.source);
+            const safeHeadline = this.sanitizeText(story.headline);
+            item.textContent = `${badge} [${safeSource}] ${safeHeadline}`;
             item.onclick = () => this.respondToNews(story);
             ticker.appendChild(item);
         });
@@ -1304,7 +1348,8 @@ class PresidentGame {
     respondToNews(story) {
         console.log('📰 Responding to:', story.headline);
         this.generateAdaptiveCrisis(story);
-        this.showNotification(`⚡ ${story.headline.substring(0, 60)}...`);
+        const safeHeadline = this.sanitizeText(story.headline);
+        this.showNotification(`⚡ ${safeHeadline.substring(0, 60)}...`);
     }
 
     // ============= ADAPTIVE CRISIS GENERATION =============
@@ -1431,7 +1476,8 @@ class PresidentGame {
             return center ? `${center.icon} ${center.name}` : '';
         }).filter(n => n).join(', ');
 
-        return `${story.source} reports this breaking development. Your response will impact: ${centerNames}`;
+        const safeSource = this.sanitizeText(story.source);
+        return `${safeSource} reports this breaking development. Your response will impact: ${centerNames}`;
     }
 
     generateAdaptiveOptions(story, affectedCenters) {
@@ -1627,15 +1673,20 @@ class PresidentGame {
         this.assert(Array.isArray(crisis.options) && crisis.options.length, 'crisis has no options');
         this.assert(Number.isFinite(this.chaos) && this.chaos >= 0 && this.chaos <= 100, 'chaos out of range');
 
-        document.getElementById('crisisTitle').textContent = crisis.title;
-        document.getElementById('crisisDescription').innerHTML = crisis.description;
+        this.safeSetText('crisisTitle', this.sanitizeText(crisis.title));
+        this.safeSetText('crisisDescription', this.sanitizeText(crisis.description));
 
         // Show affected power centers
         const affectedEl = document.getElementById('affectedCenters');
-        affectedEl.innerHTML = crisis.affectedCenters.map(id => {
+        affectedEl.innerHTML = '';
+        crisis.affectedCenters.forEach(id => {
             const center = this.powerCenters.find(p => p.id === id);
-            return center ? `<span class="affected-badge">${center.icon} ${center.name}</span>` : '';
-        }).join('');
+            if (!center) return;
+            const badge = document.createElement('span');
+            badge.className = 'affected-badge';
+            badge.textContent = `${center.icon} ${center.name}`;
+            affectedEl.appendChild(badge);
+        });
 
         const optionsDiv = document.getElementById('crisisOptions');
         optionsDiv.innerHTML = '';
@@ -1644,13 +1695,14 @@ class PresidentGame {
             const btn = document.createElement('button');
             btn.classList.add('decision-btn');
             btn.setAttribute('data-testid', 'decision-btn');
-            btn.innerHTML = `
-                ${option.text}
-                <div class="option-preview">
-                    Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} |
-                    Energy: -${option.energy}
-                </div>
-            `;
+            const label = document.createElement('span');
+            label.textContent = this.sanitizeText(option.text);
+            btn.appendChild(label);
+
+            const preview = document.createElement('div');
+            preview.className = 'option-preview';
+            preview.textContent = `Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} | Energy: -${option.energy}`;
+            btn.appendChild(preview);
             btn.onclick = () => this.handleDecision(option);
             optionsDiv.appendChild(btn);
         });
@@ -1724,30 +1776,59 @@ class PresidentGame {
 
         const modal = document.createElement('div');
         modal.className = 'breaking-news-modal';
-        modal.innerHTML = `
-            <div class="breaking-news-content">
-                <div class="breaking-badge">🚨 BREAKING NEWS 🚨</div>
-                <h2>${story.headline}</h2>
-                <p style="color: #ddd; margin: 20px 0;">This requires immediate presidential response!</p>
-                <div class="breaking-power-centers">
-                    ${story.affectedCenters.map(id => {
-                        const center = this.powerCenters.find(p => p.id === id);
-                        return center ? `<span class="affected-badge">${center.icon} ${center.name}</span>` : '';
-                    }).join('')}
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button class="breaking-btn primary" onclick="game.respondToBreakingNews('${story.headline.replace(/'/g, "\\'")}')">
-                        RESPOND NOW
-                    </button>
-                    <button class="breaking-btn secondary" onclick="game.dismissBreakingNews()">
-                        Ignore (Chaos +10)
-                    </button>
-                </div>
-            </div>
-        `;
+
+        const content = document.createElement('div');
+        content.className = 'breaking-news-content';
+
+        const badge = document.createElement('div');
+        badge.className = 'breaking-badge';
+        badge.textContent = '🚨 BREAKING NEWS 🚨';
+        content.appendChild(badge);
+
+        const title = document.createElement('h2');
+        title.textContent = this.sanitizeText(story.headline);
+        content.appendChild(title);
+
+        const desc = document.createElement('p');
+        desc.style.color = '#ddd';
+        desc.style.margin = '20px 0';
+        desc.textContent = 'This requires immediate presidential response!';
+        content.appendChild(desc);
+
+        const centers = document.createElement('div');
+        centers.className = 'breaking-power-centers';
+        story.affectedCenters.forEach(id => {
+            const center = this.powerCenters.find(p => p.id === id);
+            if (!center) return;
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'affected-badge';
+            badgeEl.textContent = `${center.icon} ${center.name}`;
+            centers.appendChild(badgeEl);
+        });
+        content.appendChild(centers);
+
+        const buttons = document.createElement('div');
+        buttons.style.display = 'flex';
+        buttons.style.gap = '10px';
+        buttons.style.marginTop = '20px';
+
+        const respondBtn = document.createElement('button');
+        respondBtn.className = 'breaking-btn primary';
+        respondBtn.textContent = 'RESPOND NOW';
+        respondBtn.addEventListener('click', () => this.respondToBreakingNews(story));
+        buttons.appendChild(respondBtn);
+
+        const ignoreBtn = document.createElement('button');
+        ignoreBtn.className = 'breaking-btn secondary';
+        ignoreBtn.textContent = 'Ignore (Chaos +10)';
+        ignoreBtn.addEventListener('click', () => this.dismissBreakingNews());
+        buttons.appendChild(ignoreBtn);
+
+        content.appendChild(buttons);
+        modal.appendChild(content);
 
         document.body.appendChild(modal);
-        
+
         // Auto-dismiss after 15 seconds
         setTimeout(() => {
             if (modal.parentNode) {
@@ -1759,14 +1840,14 @@ class PresidentGame {
         }, 15000);
     }
 
-    respondToBreakingNews(headline) {
-        const story = this.currentNewsStories.find(s => s.headline === headline);
+    respondToBreakingNews(story) {
         const modal = document.querySelector('.breaking-news-modal');
         if (modal) modal.remove();
-        
-        if (story) {
-            this.generateAdaptiveCrisis(story);
-        }
+
+        if (!story) return;
+
+        const match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
+        this.generateAdaptiveCrisis(match || story);
     }
 
     dismissBreakingNews() {
@@ -1983,10 +2064,15 @@ class PresidentGame {
         this.reporters.forEach(reporter => {
             const reporterEl = document.createElement('div');
             reporterEl.className = `reporter ${reporter.mood}`;
-            reporterEl.innerHTML = `
-                <div style="font-weight: bold;">${reporter.name}</div>
-                <div style="font-size: 12px;">${reporter.outlet}</div>
-            `;
+            const nameDiv = document.createElement('div');
+            nameDiv.style.fontWeight = 'bold';
+            nameDiv.textContent = reporter.name;
+            reporterEl.appendChild(nameDiv);
+
+            const outletDiv = document.createElement('div');
+            outletDiv.style.fontSize = '12px';
+            outletDiv.textContent = reporter.outlet;
+            reporterEl.appendChild(outletDiv);
             reporterEl.onclick = () => this.selectReporter(reporter, reporterEl);
             row.appendChild(reporterEl);
         });
@@ -2035,12 +2121,29 @@ class PresidentGame {
         this.relationships.forEach(rel => {
             const card = document.createElement('div');
             card.className = 'relationship-card';
-            card.innerHTML = `
-                <div class="relationship-name">${rel.name}</div>
-                <div style="font-size: 12px; color: #aaa;">${rel.role}</div>
-                <div class="meter"><div class="meter-fill trust-fill" style="width: ${rel.trust}%"></div></div>
-                <div style="font-size: 10px;">Trust: ${rel.trust}%</div>
-            `;
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'relationship-name';
+            nameDiv.textContent = rel.name;
+            card.appendChild(nameDiv);
+
+            const roleDiv = document.createElement('div');
+            roleDiv.style.fontSize = '12px';
+            roleDiv.style.color = '#aaa';
+            roleDiv.textContent = rel.role;
+            card.appendChild(roleDiv);
+
+            const meter = document.createElement('div');
+            meter.className = 'meter';
+            const fill = document.createElement('div');
+            fill.className = 'meter-fill trust-fill';
+            fill.style.width = `${rel.trust}%`;
+            meter.appendChild(fill);
+            card.appendChild(meter);
+
+            const trustLabel = document.createElement('div');
+            trustLabel.style.fontSize = '10px';
+            trustLabel.textContent = `Trust: ${rel.trust}%`;
+            card.appendChild(trustLabel);
             card.onclick = () => this.initiatePhoneCall(rel);
             grid.appendChild(card);
         });
@@ -2059,7 +2162,7 @@ class PresidentGame {
 
         const notif = document.createElement('div');
         notif.className = 'notification';
-        notif.textContent = message;
+        notif.textContent = this.sanitizeText(message);
         document.body.appendChild(notif);
 
         setTimeout(() => notif.remove(), 3000);
