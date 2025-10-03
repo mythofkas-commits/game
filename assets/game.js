@@ -233,6 +233,11 @@ class PresidentGame {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        const temp = document.createElement('div');
+        temp.textContent = input;
+        const decoded = temp.innerHTML;
+
+        return decoded.replace(/<[^>]*>/g, '');
     }
 
     /**
