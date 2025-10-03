@@ -300,7 +300,7 @@ export class GameState {
     #validateDay(value) {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 1) {
-            throw new Error('Day must be a positive integer');
+            throw new Error('Day must be >= 1');
         }
         return Math.floor(num);
     }
