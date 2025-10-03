@@ -233,6 +233,11 @@ class PresidentGame {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        const temp = document.createElement('div');
+        temp.textContent = input;
+        const decoded = temp.innerHTML;
+
+        return decoded.replace(/<[^>]*>/g, '');
     }
 
     /**
@@ -1903,6 +1908,7 @@ class PresidentGame {
         } else if (story && typeof story === 'object') {
             match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
         }
+        const match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
         this.generateAdaptiveCrisis(match || story);
     }
 
