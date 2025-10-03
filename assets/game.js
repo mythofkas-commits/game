@@ -1887,10 +1887,21 @@ class PresidentGame {
         const modal = document.querySelector('.breaking-news-modal');
         if (modal) modal.remove();
 
-        if (!story) return;
+        if (!story || typeof story !== 'object' || !story.headline || !story.source) {
+            console.warn('Invalid story object passed to respondToBreakingNews:', story);
+            this.showNotification('⚠️ Unable to respond: invalid breaking news story.');
+            return;
+        }
 
-        const match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
-        this.generateAdaptiveCrisis(match || story);
+        const match = this.currentNewsStories.find(
+            s => s && s.headline === story.headline && s.source === story.source
+        );
+        if (!match) {
+            console.warn('Breaking news story not found in currentNewsStories:', story);
+            this.showNotification('⚠️ Breaking news story not found in current news.');
+            return;
+        }
+        this.generateAdaptiveCrisis(match);
     }
 
     dismissBreakingNews() {
