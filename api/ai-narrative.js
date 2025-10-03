@@ -30,15 +30,51 @@ export default async function handler(req, res) {
 
     // Craft prompt based on generation type
     let prompt = '';
-    if (generationType === 'scandal') {
-      prompt = `Generate a satirical political scandal for a US President simulator game. Base it on this real-world news headline: "${newsHeadline}". Incorporate the player's history: ${JSON.stringify(playerContext.history)}. Affect relationships with ${playerContext.relationships.map(r => r.name).join(', ')} (e.g., adjust trust, respect, fear). Return ONLY valid JSON: { "headline": "string", "description": "string", "impacts": { "chaos": number, "energy": number, "score": number, "relationships": [{ "name": "string", "trust": number, "respect": number, "fear": number }] } }`;
+    if (generationType === 'crisis_options') {
+      prompt = `You are creating response options for a political simulation game. The president faces this real news:
+
+"${newsHeadline}"
+
+Player state:
+- Chaos: ${playerContext.chaos}/100
+- Energy: ${playerContext.energy}/100
+- Power centers: ${JSON.stringify(playerContext.relationships)}
+
+Generate 4 DISTINCT, SPECIFIC response options. Each must be:
+1. A concrete action (e.g., "Deploy carrier group", "Call NATO summit", "Propose $500B package")
+2. NOT vague (no "take measured approach", "be decisive")
+3. Meaningfully different from others
+4. Start with an emoji
+
+Return ONLY valid JSON:
+{
+  "options": [
+    {
+      "text": "🚢 Deploy naval forces to Taiwan Strait",
+      "effects": {
+        "relationships": [
+          { "center": "military", "change": 15 },
+          { "center": "wallstreet", "change": -10 }
+        ]
+      },
+      "chaos": 20,
+      "energy": 25
+    },
+    // ... 3 more options
+  ]
+}
+
+Valid centers: military, congress, intelligence, wallstreet, media, public, industry, science
+Vary chaos: -10 to +30, energy: 10 to 30`;
+    } else if (generationType === 'scandal') {
+      prompt = `Generate satirical scandal based on: "${newsHeadline}". Return ONLY JSON: { "headline": "string", "description": "string", "impacts": { "chaos": number, "energy": number, "relationships": [{ "center": "string", "change": number }] } }`;
     } else if (generationType === 'diplomaticTwist') {
-      prompt = `Create a diplomatic event for a US President simulator based on news: "${newsHeadline}". Use player decisions: ${JSON.stringify(playerContext.decisions)}. Make it engaging and unpredictable. Return ONLY valid JSON: { "event": "string", "options": ["string"], "outcomes": [{ "chaos": number, "energy": number, "score": number, "relationships": [{ "name": "string", "trust": number, "respect": number, "fear": number }] }] }`;
+      prompt = `Create diplomatic event for: "${newsHeadline}". Return ONLY JSON: { "event": "string", "options": ["string"], "outcomes": [{ "chaos": number, "energy": number, "relationships": [{ "center": "string", "change": number }] }] }`;
     } else {
       throw new Error('Invalid generation type');
     }
 
-    const response = await openai.chat.completions.create({
+    let response = await openai.chat.completions.create({
       model: 'gpt-4o-mini', // Cost-efficient, ~$0.15/1M input tokens
       messages: [
         { role: 'system', content: 'You are a creative, satirical political narrative generator for a game. Always return valid JSON only.' },
@@ -70,6 +106,17 @@ export default async function handler(req, res) {
     }
 
     // Validate required fields
+    if (generationType === 'crisis_options') {
+      if (!generated.options || !Array.isArray(generated.options) || generated.options.length < 3) {
+        throw new Error('Need at least 3 crisis options');
+      }
+      for (const opt of generated.options) {
+        if (!opt.text || !opt.effects || !opt.effects.relationships) {
+          throw new Error('Invalid option structure');
+        }
+      }
+    }
+
     if (generationType === 'scandal' && (!generated.headline || !generated.description || !generated.impacts)) {
       throw new Error('Incomplete scandal response');
     }
@@ -91,6 +138,34 @@ export default async function handler(req, res) {
         event: 'Diplomatic Misstep!',
         options: ['Apologize', 'Double Down'],
         outcomes: [{ chaos: 15, energy: -10, score: -10, relationships: [] }]
+      },
+      crisis_options: {
+        options: [
+          {
+            text: '🚨 Declare federal emergency response',
+            effects: { relationships: [{ center: 'public', change: 12 }] },
+            chaos: 8,
+            energy: 18
+          },
+          {
+            text: '🤝 Convene bipartisan summit',
+            effects: { relationships: [{ center: 'congress', change: 10 }] },
+            chaos: -4,
+            energy: 16
+          },
+          {
+            text: '🐦 Address nation via social media blitz',
+            effects: { relationships: [{ center: 'media', change: -6 }, { center: 'public', change: 9 }] },
+            chaos: 14,
+            energy: 6
+          },
+          {
+            text: '🎖️ Mobilize military advisors',
+            effects: { relationships: [{ center: 'military', change: 11 }] },
+            chaos: 16,
+            energy: 20
+          }
+        ]
       }
     };
     res.status(200).json({ success: false, narrative: fallback[generationType] || fallback.scandal });
