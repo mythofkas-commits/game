@@ -6,6 +6,8 @@ Place this file at: assets/game.js
 =============================================================================
 */
 
+import { GameState } from './state.js';
+
 let game = null;
 window.game = null;
 
@@ -20,11 +22,6 @@ function startPresidency() {
 
 class PresidentGame {
     constructor() {
-        this.day = 1;
-        this.energy = 100;
-        this.chaos = 0;
-        this.score = 0;
-
         // POWER CENTERS - The Core System
         this.powerCenters = [
             { id: 'congress', name: 'Congress', icon: '🏛️', value: 50, color: '#4169E1' },
@@ -36,6 +33,16 @@ class PresidentGame {
             { id: 'industry', name: 'Industry', icon: '🏭', value: 55, color: '#708090' },
             { id: 'science', name: 'Scientific Community', icon: '🎓', value: 45, color: '#9370DB' }
         ];
+
+        this.state = new GameState({
+            day: 1,
+            energy: 100,
+            chaos: 0,
+            score: 0,
+            powerCenters: this.powerCenters.map(({ id, value }) => ({ id, value }))
+        });
+
+        this.state.onChange((diff, prev, next, meta) => this.handleStateChange(diff, prev, next, meta));
 
         this.currentNewsStories = [];
         this.newsCache = this.loadNewsCache() || [];
@@ -174,6 +181,38 @@ class PresidentGame {
         };
     }
 
+    get day() {
+        return this.state.snapshot.day;
+    }
+
+    set day(value) {
+        this.state.setDay(value);
+    }
+
+    get energy() {
+        return this.state.snapshot.energy;
+    }
+
+    set energy(value) {
+        this.state.setEnergy(value);
+    }
+
+    get chaos() {
+        return this.state.snapshot.chaos;
+    }
+
+    set chaos(value) {
+        this.state.setChaos(value);
+    }
+
+    get score() {
+        return this.state.snapshot.score;
+    }
+
+    set score(value) {
+        this.state.setScore(value);
+    }
+
     /**
      * Sanitize user-provided or external text to prevent XSS.
      * @param {string} input
@@ -182,6 +221,18 @@ class PresidentGame {
     sanitizeText(input) {
         if (typeof input !== 'string') return '';
 
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<!doctype html><body>${input}`, 'text/html');
+            return doc?.body?.textContent ?? '';
+        } catch {
+            return String(input)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
         const temp = document.createElement('div');
         temp.textContent = input;
         const decoded = temp.innerHTML;
@@ -204,16 +255,12 @@ class PresidentGame {
     // ============= ANALYTICS TRACKING =============
 
     trackEvent(eventType, data = {}) {
+        const snapshot = this.state.snapshot;
         const event = {
             type: eventType,
             timestamp: Date.now(),
             sessionId: this.sessionId,
-            gameState: {
-                day: this.day,
-                energy: this.energy,
-                chaos: this.chaos,
-                score: this.score
-            },
+            gameState: snapshot,
             ...data
         };
 
@@ -246,11 +293,12 @@ class PresidentGame {
             session.events = this.analytics.events;
             session.lastUpdate = Date.now();
             session.duration = Date.now() - this.sessionStart;
+            const snapshot = this.state.snapshot;
             session.finalState = {
-                day: this.day,
-                energy: this.energy,
-                chaos: this.chaos,
-                score: this.score,
+                day: snapshot.day,
+                energy: snapshot.energy,
+                chaos: snapshot.chaos,
+                score: snapshot.score,
                 powerCenters: this.powerCenters.map(p => ({ id: p.id, value: p.value }))
             };
             
@@ -278,7 +326,85 @@ class PresidentGame {
     }
 
     knownPowerCentersSet() {
-        return new Set((this.powerCenters || []).map(p => p.id));
+        return this.state.knownPowerCenters;
+    }
+
+    handleStateChange(diff, prev, next, meta = {}) {
+        if (!diff || Object.keys(diff).length === 0) return;
+        if (this.debug && typeof this.debugTrace === 'function') {
+            this.debugTrace('state-change', diff);
+        }
+
+        if (diff.power) {
+            const detailSource = Array.isArray(meta?.powerChanges) && meta.powerChanges.length
+                ? meta.powerChanges
+                : Object.entries(diff.power).map(([id, [oldValue, newValue]]) => ({
+                    id,
+                    oldValue,
+                    newValue,
+                    change: newValue - oldValue,
+                    reason: meta?.powerReasons?.[id] ?? meta?.reason ?? ''
+                }));
+
+            detailSource.forEach(change => {
+                if (!change || typeof change.id !== 'string') return;
+                const resolvedReason = change.reason ?? meta?.powerReasons?.[change.id] ?? meta?.reason ?? '';
+                this.applyPowerChangeUI({
+                    id: change.id,
+                    oldValue: change.oldValue,
+                    newValue: change.newValue,
+                    change: change.change,
+                    reason: resolvedReason
+                });
+            });
+        }
+
+        if (diff.day || diff.energy || diff.chaos || diff.score) {
+            this.updateDisplay();
+        }
+    }
+
+    applyPowerChangeUI({ id, oldValue = 0, newValue = 0, change = 0, reason = '' }) {
+        const center = this.powerCenters.find(p => p.id === id);
+        if (!center) return;
+
+        if (Number.isFinite(newValue)) {
+            center.value = newValue;
+        }
+
+        const fillEl = document.getElementById(`power-${id}`);
+        let card = null;
+        if (fillEl) {
+            fillEl.style.width = `${center.value}%`;
+            card = fillEl.closest('.power-center-card');
+            if (card && change) {
+                card.classList.add(change > 0 ? 'power-increase' : 'power-decrease');
+                setTimeout(() => card.classList.remove('power-increase', 'power-decrease'), 500);
+            }
+        }
+
+        const valueEl = (card || document).querySelector(card ? '.power-value' : `#power-${id} ~ .power-value`);
+        if (valueEl) {
+            valueEl.textContent = `${Math.round(center.value)}%`;
+        }
+
+        if (change && Math.abs(change) >= 5) {
+            this.showPowerChangeNotification(center, change, reason);
+        }
+
+        if (change) {
+            this.history.powerChanges.push({
+                center: id,
+                oldValue,
+                newValue: center.value,
+                change,
+                reason,
+                timestamp: Date.now()
+            });
+            this.triggerCascadeEffects(id, change);
+        }
+
+        this.checkCoalitions();
     }
 
     getPlayerContextForAI() {
@@ -336,59 +462,11 @@ class PresidentGame {
     }
 
     snapshotState() {
-        const power = Object.fromEntries(this.powerCenters.map(p => [p.id, p.value]));
-        let relationships = null;
-        if (Array.isArray(this.relationships)) {
-            relationships = {};
-            for (const rel of this.relationships) {
-                const key = rel.id || rel.name || rel.role || `rel-${Object.keys(relationships).length}`;
-                relationships[key] = {
-                    trust: rel.trust,
-                    respect: rel.respect,
-                    fear: rel.fear
-                };
-            }
-        }
-        return {
-            chaos: this.chaos,
-            energy: this.energy,
-            power,
-            relationships
-        };
+        return this.state.snapshot;
     }
 
     diffStates(a, b) {
-        const d = {};
-        if (a.chaos !== b.chaos) d.chaos = [a.chaos, b.chaos];
-        if (a.energy !== b.energy) d.energy = [a.energy, b.energy];
-        const power = {};
-        const powerKeys = new Set([
-            ...Object.keys(a.power || {}),
-            ...Object.keys(b.power || {})
-        ]);
-        for (const k of powerKeys) {
-            const av = (a.power || {})[k];
-            const bv = (b.power || {})[k];
-            if (av !== bv) power[k] = [av, bv];
-        }
-        if (Object.keys(power).length) d.power = power;
-
-        if (a.relationships && b.relationships) {
-            const relDiff = {};
-            const relKeys = new Set([
-                ...Object.keys(a.relationships || {}),
-                ...Object.keys(b.relationships || {})
-            ]);
-            for (const key of relKeys) {
-                const av = (a.relationships || {})[key];
-                const bv = (b.relationships || {})[key];
-                if (JSON.stringify(av) !== JSON.stringify(bv)) {
-                    relDiff[key] = [av, bv];
-                }
-            }
-            if (Object.keys(relDiff).length) d.relationships = relDiff;
-        }
-        return d;
+        return GameState.diff(a, b);
     }
 
     explainDisabled(btn, reason) {
@@ -665,43 +743,11 @@ class PresidentGame {
     }
 
     updatePowerCenter(id, change, reason = '') {
-        const center = this.powerCenters.find(p => p.id === id);
-        if (!center) return;
-
-        const oldValue = center.value;
-        center.value = Math.max(0, Math.min(100, center.value + change));
-        
-        // Animate the change
-        const fillEl = document.getElementById(`power-${id}`);
-        if (fillEl) {
-            fillEl.style.width = `${center.value}%`;
-            
-            // Flash effect
-            const card = fillEl.closest('.power-center-card');
-            card.classList.add(change > 0 ? 'power-increase' : 'power-decrease');
-            setTimeout(() => {
-                card.classList.remove('power-increase', 'power-decrease');
-            }, 500);
+        try {
+            this.state.updatePower(id, change, reason);
+        } catch (err) {
+            console.warn('Failed to update power center', id, err);
         }
-
-        // Show change notification
-        if (Math.abs(change) >= 5) {
-            this.showPowerChangeNotification(center, change, reason);
-        }
-
-        // Record in history
-        this.history.powerChanges.push({
-            center: id,
-            oldValue,
-            newValue: center.value,
-            change,
-            reason,
-            timestamp: Date.now()
-        });
-
-        // Check for cascades
-        this.triggerCascadeEffects(id, change);
-        this.checkCoalitions();
     }
 
     showPowerChangeNotification(center, change, reason) {
@@ -786,12 +832,14 @@ class PresidentGame {
             return;
         }
 
+        const sanitizedContent = this.sanitizeText(content);
+
         // Analyze the tweet
-        const analysis = this.analyzeTweet(content);
+        const analysis = this.analyzeTweet(sanitizedContent);
 
         // Track tweet
         this.trackEvent('tweet_sent', {
-            content,
+            content: sanitizedContent,
             tone: analysis.tone,
             chaos: analysis.chaos,
             targets: analysis.targets,
@@ -799,28 +847,29 @@ class PresidentGame {
         });
 
         this.history.tweets.push({
-            content,
+            content: sanitizedContent,
             analysis,
             timestamp: Date.now()
         });
 
-        // Apply effects to power centers
+        const powerReasons = {};
         Object.entries(analysis.powerEffects).forEach(([centerId, change]) => {
             if (Math.abs(change) > 0) {
-                this.updatePowerCenter(centerId, change, 'Your tweet');
+                powerReasons[centerId] = 'Your tweet';
             }
         });
 
-        // Apply game effects
-        this.chaos = Math.min(100, this.chaos + analysis.chaos);
-        this.energy -= analysis.energyCost;
-        
+        this.state.applyEffects({
+            chaosDelta: analysis.chaos,
+            energyDelta: -analysis.energyCost,
+            power: analysis.powerEffects
+        }, { source: 'tweet', powerReasons });
+
 
         input.value = '';
-        
+
         // Show detailed feedback
         this.showTweetFeedback(analysis);
-        this.updateDisplay();
 
         // If responding to crisis or breaking news, dismiss it
         if (this.respondingToCrisis) {
@@ -1061,9 +1110,9 @@ class PresidentGame {
             this.displayNewsTicker();
             this.lastNewsFetch = Date.now();
 
-            // Trigger breaking news for high relevance
-            const breakingNews = this.currentNewsStories.filter(s => s.relevance > 0.75);
-            if (breakingNews.length > 0 && this.rand() < 0.4) {
+            const breakingNews = this.currentNewsStories.filter(s => s.relevance >= 0.85);
+            if (breakingNews.length > 0 && this.rand() < 0.2) {
+                console.log('🚨 BREAKING NEWS triggered for:', breakingNews[0].headline, `(relevance: ${breakingNews[0].relevance.toFixed(2)})`);
                 setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
@@ -1112,19 +1161,40 @@ class PresidentGame {
 
     calculateRelevance(title, description) {
         const text = (title + ' ' + (description || '')).toLowerCase();
-        let score = 0.3;
+        let score = 0;
 
-        const highKeywords = ['president', 'congress', 'senate', 'white house', 'impeach', 'scandal', 
-            'crisis', 'trump', 'biden', 'government', 'federal', 'washington', 'supreme court'];
+        const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
+        let criticalMatches = 0;
+        criticalKeywords.forEach(keyword => {
+            if (text.includes(keyword)) criticalMatches++;
+        });
+
+        if (criticalMatches >= 2) {
+            score = 0.8;
+        } else if (criticalMatches === 1) {
+            score = 0.5;
+        } else {
+            score = 0.2;
+        }
+
+        const highKeywords = ['president', 'congress', 'senate', 'white house', 'scandal', 'trump', 'biden', 'government', 'federal', 'supreme court'];
+        let highMatches = 0;
         highKeywords.forEach(keyword => {
-            if (text.includes(keyword)) score += 0.15;
+            if (text.includes(keyword)) highMatches++;
         });
 
-        const medKeywords = ['election', 'bill', 'policy', 'democrat', 'republican', 'nato', 
-            'china', 'russia', 'military', 'economy', 'inflation', 'trade'];
+        if (highMatches >= 2) score += 0.15;
+        else if (highMatches === 1) score += 0.05;
+
+        const medKeywords = ['election', 'bill', 'policy', 'democrat', 'republican', 'nato', 'china', 'russia', 'military', 'economy'];
+        let medMatches = 0;
         medKeywords.forEach(keyword => {
-            if (text.includes(keyword)) score += 0.08;
+            if (text.includes(keyword)) medMatches++;
         });
+
+        if (medMatches >= 2) score += 0.08;
+
+        console.log(`📊 Relevance for "${(title || '').substring(0, 50)}...": ${score.toFixed(2)} (critical: ${criticalMatches}, high: ${highMatches}, med: ${medMatches})`);
 
         return Math.min(1, score);
     }
@@ -1485,46 +1555,71 @@ class PresidentGame {
         const category = story.category || 'domestic';
         const headline = (story.headline || '').toLowerCase();
 
-        console.log(`🎮 Generating options for: "${story.headline}" (Category: ${category})`);
+        const extractKeyTopic = (text) => {
+            const h = text.toLowerCase();
+            if (h.includes('china') || h.includes('xi')) return 'China';
+            if (h.includes('russia') || h.includes('putin')) return 'Russia';
+            if (h.includes('iran')) return 'Iran';
+            if (h.includes('north korea') || h.includes('kim')) return 'North Korea';
+            if (h.includes('ukraine')) return 'Ukraine';
+            if (h.includes('israel') || h.includes('palestine')) return 'Israel';
+            if (h.includes('taiwan')) return 'Taiwan';
+            if (h.includes('market') || h.includes('stock')) return 'markets';
+            if (h.includes('inflation') || h.includes('economy')) return 'economy';
+            if (h.includes('congress') || h.includes('senate')) return 'Congress';
+            if (h.includes('scandal') || h.includes('investigation')) return 'scandal';
+            return 'this situation';
+        };
 
-        // Option 1: Context-specific aggressive response
+        const keyTopic = extractKeyTopic(headline);
+        const shortHeadline = (story.headline || '').substring(0, 40);
+
+        console.log(`🎮 Generating options for: "${story.headline}" (Category: ${category}, Topic: ${keyTopic})`);
+
         if (category === 'foreign') {
-            const aggressiveText = headline.includes('china') ? '🚢 Deploy Naval Forces' : 
-                                   headline.includes('russia') ? '🎯 Increase Sanctions' :
-                                   headline.includes('iran') ? '⚔️ Military Threat' :
-                                   '💪 Show Military Strength';
-            
+            const aggressiveText = keyTopic === 'China'
+                ? `💪 Confront China directly on "${shortHeadline}..."`
+                : keyTopic === 'Russia'
+                    ? `⚔️ Impose harsh sanctions over "${shortHeadline}..."`
+                    : keyTopic === 'Iran'
+                        ? `🎯 Issue military ultimatum regarding "${shortHeadline}..."`
+                        : `💪 Take aggressive stance on "${shortHeadline}..."`;
+
             options.push({
                 text: aggressiveText,
                 effects: affectedCenters.map(id => {
                     if (id === 'military') return { center: id, change: 15 };
-                    if (id === 'wallstreet') return { center: id, change: -15 };
+                    if (id === 'wallstreet') return { center: id, change: -12 };
                     if (id === 'intelligence') return { center: id, change: 10 };
-                    return { center: id, change: 5 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 3 };
                 }),
                 chaos: 20,
                 energy: 25
             });
         } else if (category === 'economy') {
-            const economicText = headline.includes('inflation') ? '🏦 Emergency Fed Meeting' :
-                                headline.includes('market') ? '💵 Stimulus Package' :
-                                headline.includes('unemploy') ? '💼 Jobs Program' :
-                                '📊 Economic Intervention';
-            
+            const economicText = headline.includes('inflation')
+                ? `🏦 Emergency action on inflation: "${shortHeadline}..."`
+                : headline.includes('market')
+                    ? `💵 Stabilize markets after "${shortHeadline}..."`
+                    : headline.includes('unemploy')
+                        ? `💼 Launch jobs program responding to "${shortHeadline}..."`
+                        : `📊 Strong economic intervention: "${shortHeadline}..."`;
+
             options.push({
                 text: economicText,
                 effects: affectedCenters.map(id => {
-                    if (id === 'wallstreet') return { center: id, change: 15 };
+                    if (id === 'wallstreet') return { center: id, change: 12 };
                     if (id === 'industry') return { center: id, change: 10 };
                     if (id === 'public') return { center: id, change: 8 };
                     return { center: id, change: 5 };
                 }),
-                chaos: 10,
+                chaos: 12,
                 energy: 20
             });
         } else if (category === 'scandal') {
             options.push({
-                text: '⚔️ Attack Accusers',
+                text: `⚔️ Attack accusers over "${shortHeadline}..."`,
                 effects: affectedCenters.map(id => {
                     if (id === 'media') return { center: id, change: -20 };
                     if (id === 'public') return { center: id, change: 10 };
@@ -1534,25 +1629,13 @@ class PresidentGame {
                 chaos: 25,
                 energy: 15
             });
-        } else if (category === 'military') {
-            options.push({
-                text: '🎖️ Mobilize Forces',
-                effects: affectedCenters.map(id => {
-                    if (id === 'military') return { center: id, change: 20 };
-                    if (id === 'congress') return { center: id, change: -10 };
-                    if (id === 'public') return { center: id, change: 12 };
-                    return { center: id, change: 5 };
-                }),
-                chaos: 25,
-                energy: 25
-            });
         } else {
             options.push({
-                text: '💪 Take Strong Action',
+                text: `💪 Take decisive action on "${shortHeadline}..."`,
                 effects: affectedCenters.map(id => {
                     if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
                     if (id === 'media') return { center: id, change: -5 };
-                    if (id === 'public') return { center: id, change: 15 };
+                    if (id === 'public') return { center: id, change: 12 };
                     return { center: id, change: 5 };
                 }),
                 chaos: 15,
@@ -1560,10 +1643,9 @@ class PresidentGame {
             });
         }
 
-        // Option 2: Context-specific diplomatic response
         if (category === 'foreign') {
             options.push({
-                text: '🤝 Diplomatic Negotiations',
+                text: `🤝 Seek diplomatic solution with ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'congress') return { center: id, change: 12 };
                     if (id === 'military') return { center: id, change: -8 };
@@ -1575,7 +1657,7 @@ class PresidentGame {
             });
         } else if (category === 'economy') {
             options.push({
-                text: '📋 Bipartisan Commission',
+                text: `📋 Form bipartisan commission on ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'congress') return { center: id, change: 15 };
                     if (id === 'media') return { center: id, change: 8 };
@@ -1584,9 +1666,21 @@ class PresidentGame {
                 chaos: -8,
                 energy: 12
             });
+        } else if (category === 'scandal') {
+            options.push({
+                text: `🛡️ Lawyer up and stonewall on "${shortHeadline}..."`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: -10 };
+                    if (id === 'public') return { center: id, change: -5 };
+                    if (id === 'congress') return { center: id, change: 5 };
+                    return { center: id, change: 2 };
+                }),
+                chaos: 8,
+                energy: 12
+            });
         } else {
             options.push({
-                text: '🤝 Measured Response',
+                text: `🤝 Take measured approach to ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'congress') return { center: id, change: 10 };
                     if (id === 'media') return { center: id, change: 8 };
@@ -1598,9 +1692,8 @@ class PresidentGame {
             });
         }
 
-        // Option 3: Twitter Response (always available)
         options.push({
-            text: '🐦 Tweet About It',
+            text: `🐦 Tweet storm about ${keyTopic}`,
             effects: affectedCenters.map(id => {
                 if (id === 'public') return { center: id, change: 12 };
                 if (id === 'media') return { center: id, change: -8 };
@@ -1611,10 +1704,9 @@ class PresidentGame {
             action: 'focusTwitter'
         });
 
-        // Option 4: Context-specific bold move
         if (category === 'scandal') {
             options.push({
-                text: '🎤 Emergency Press Conference',
+                text: `🎤 Emergency press conference on "${shortHeadline}..."`,
                 effects: affectedCenters.map(id => {
                     if (id === 'media') return { center: id, change: 10 };
                     if (id === 'public') return { center: id, change: 8 };
@@ -1624,44 +1716,33 @@ class PresidentGame {
                 energy: 15,
                 action: 'pressConference'
             });
-        } else if (category === 'military') {
+        } else if (category === 'foreign' && (keyTopic === 'China' || keyTopic === 'Russia')) {
             options.push({
-                text: '🎖️ Emergency War Powers',
-                effects: affectedCenters.map(id => {
-                    if (id === 'military') return { center: id, change: 20 };
-                    if (id === 'congress') return { center: id, change: -15 };
-                    if (id === 'public') return { center: id, change: 10 };
-                    return { center: id, change: 5 };
-                }),
-                chaos: 30,
-                energy: 25
-            });
-        } else if (category === 'foreign') {
-            options.push({
-                text: '🌍 Call Allied Summit',
+                text: `📞 Call emergency meeting with ${keyTopic} leader`,
                 effects: affectedCenters.map(id => {
                     if (id === 'intelligence') return { center: id, change: 15 };
                     if (id === 'congress') return { center: id, change: 10 };
+                    if (id === 'military') return { center: id, change: 5 };
                     return { center: id, change: 5 };
                 }),
-                chaos: 8,
+                chaos: 10,
                 energy: 20
             });
         } else {
             options.push({
-                text: '🔥 Attack Opponents',
+                text: `🔥 Go on offensive about ${keyTopic}`,
                 effects: affectedCenters.map(id => {
                     if (id === 'public') return { center: id, change: 10 };
-                    if (id === 'media') return { center: id, change: -15 };
-                    if (id === 'congress') return { center: id, change: -10 };
+                    if (id === 'media') return { center: id, change: -12 };
+                    if (id === 'congress') return { center: id, change: -8 };
                     return { center: id, change: -5 };
                 }),
-                chaos: 25,
+                chaos: 22,
                 energy: 15
             });
         }
 
-        console.log(`✅ Generated ${options.length} context-specific options`);
+        console.log(`✅ Generated ${options.length} SPECIFIC options for ${keyTopic}`);
         return options;
     }
 
@@ -1712,16 +1793,16 @@ class PresidentGame {
     }
 
     handleDecision(option) {
-        // Track decision
+        const crisisTitle = this.currentCrisis?.title ?? 'Unknown Crisis';
+        const crisisCategory = this.currentCrisis?.newsStory?.category;
         this.trackEvent('decision_made', {
-            crisis: this.currentCrisis.title,
+            crisis: crisisTitle,
             option: option.text,
-            category: this.currentCrisis.newsStory?.category,
+            category: crisisCategory,
             chaos: option.chaos,
             energy: option.energy
         });
 
-        // Special actions
         if (option.action === 'focusTwitter') {
             this.focusTwitter();
             return;
@@ -1730,22 +1811,40 @@ class PresidentGame {
             this.startPressConference();
         }
 
-        // Apply effects to power centers
-        option.effects.forEach(effect => {
-            this.updatePowerCenter(effect.center, effect.change, 'Your decision');
+        const crisisPanel = document.getElementById('crisisPanel');
+        if (crisisPanel) {
+            crisisPanel.style.opacity = '0.5';
+        }
+        this.safeSetText('crisisTitle', '⏳ Processing your decision...');
+        this.safeSetText('crisisDescription', 'Calculating effects on power centers and relationships...');
+        const optionsEl = document.getElementById('crisisOptions');
+        if (optionsEl) optionsEl.innerHTML = '';
+
+        const powerEffects = {};
+        const powerReasons = {};
+        (Array.isArray(option.effects) ? option.effects : []).forEach(effect => {
+            if (!effect || !effect.center) return;
+            powerEffects[effect.center] = (powerEffects[effect.center] || 0) + (effect.change || 0);
+            powerReasons[effect.center] = 'Your decision';
         });
 
-        // Apply game state changes
-        this.chaos = Math.max(0, Math.min(100, this.chaos + option.chaos));
-        this.energy = Math.max(0, this.energy - option.energy);
-        this.score += Math.abs(option.chaos) * 5;
+        const chaosDelta = option.chaos || 0;
+        const energyCost = Math.max(0, Number(option.energy || 0));
+        const scoreDelta = Math.abs(chaosDelta) * 5;
+
+        this.state.applyEffects({
+            chaosDelta,
+            energyDelta: -energyCost,
+            power: powerEffects,
+            scoreDelta
+        }, { source: 'decision', powerReasons, option: option.text });
 
         const decisionCategory =
-            this.currentCrisis?.newsStory?.category ??
+            crisisCategory ??
             this.currentCrisis?.category ??
             'unknown';
         this.history.decisions.push({
-            crisis: this.currentCrisis?.title ?? 'Unknown Crisis',
+            crisis: crisisTitle,
             option: option.text,
             category: decisionCategory,
             chaos: option.chaos ?? 0,
@@ -1754,18 +1853,21 @@ class PresidentGame {
             timestamp: Date.now()
         });
 
-        this.showNotification(`Decision made: ${option.text}`);
-        this.updateDisplay();
+        const optionText = typeof option.text === 'string' ? option.text : String(option.text ?? 'Decision');
+        const truncated = optionText.length > 40 ? `${optionText.substring(0, 40)}...` : optionText;
+        this.showNotification(`✅ Decision made: ${truncated}`);
 
-        // Generate next crisis after delay
         setTimeout(() => {
+            if (crisisPanel) {
+                crisisPanel.style.opacity = '1';
+            }
             if (this.currentNewsStories.length > 0) {
                 const randomNews = this.currentNewsStories[Math.floor(this.rand() * this.currentNewsStories.length)];
                 this.generateAdaptiveCrisis(randomNews);
             } else {
                 this.generateContextualCrisis();
             }
-        }, 3000);
+        }, 1000);
     }
 
     // ============= BREAKING NEWS ALERT =============
@@ -1832,8 +1934,7 @@ class PresidentGame {
         // Auto-dismiss after 15 seconds
         setTimeout(() => {
             if (modal.parentNode) {
-                this.chaos += 10;
-                this.updateDisplay();
+                this.state.applyEffects({ chaosDelta: 10 }, { source: 'breaking-news-timeout' });
                 modal.remove();
                 this.showNotification('⚠️ Ignored breaking news - chaos increased!');
             }
@@ -1853,10 +1954,11 @@ class PresidentGame {
     dismissBreakingNews() {
         const modal = document.querySelector('.breaking-news-modal');
         if (modal) modal.remove();
-        this.chaos += 10;
-        this.updateDisplay();
+        this.state.applyEffects({
+            chaosDelta: 10,
+            power: { media: -10 }
+        }, { source: 'breaking-news-ignore', powerReasons: { media: 'Ignored breaking news' } });
         this.showNotification('⚠️ Breaking news ignored - media trust drops');
-        this.updatePowerCenter('media', -10, 'Ignored breaking news');
     }
 
     // ============= NEWS CACHING =============
@@ -1986,9 +2088,8 @@ class PresidentGame {
     }
 
     gameLoop() {
-        this.day += 1;
-        this.energy = Math.max(0, this.energy - 2);
-        this.score += 10;
+        this.day = this.day + 1;
+        this.state.applyEffects({ energyDelta: -2, scoreDelta: 10 }, { source: 'game-loop' });
 
         // Small random power center drift
         if (this.rand() < 0.3) {
@@ -1996,8 +2097,6 @@ class PresidentGame {
             const drift = (this.rand() - 0.5) * 4;
             this.updatePowerCenter(randomCenter.id, drift, 'Daily drift');
         }
-
-        this.updateDisplay();
     }
 
     initiatePhoneCall(caller) {
@@ -2023,19 +2122,23 @@ class PresidentGame {
 
         if (roll < successChance) {
             // Success
-            this.score += 50;
-            this.chaos = Math.max(0, this.chaos - 10);
+            this.state.applyEffects({
+                chaosDelta: -10,
+                energyDelta: -10,
+                scoreDelta: 50
+            }, { source: 'phone-call-success', caller: caller.name });
             this.updateRelationshipValues(caller.name, 10, 5, 0);
             this.showNotification(`✅ Successful negotiation with ${caller.name}!`);
         } else {
             // Failure
-            this.chaos += 10;
+            this.state.applyEffects({
+                chaosDelta: 10,
+                energyDelta: -10
+            }, { source: 'phone-call-failure', caller: caller.name });
             this.updateRelationshipValues(caller.name, -10, -5, 10);
             this.showNotification(`❌ ${caller.name} rejects your proposal!`);
         }
 
-        this.energy -= 10;
-        this.updateDisplay();
         this.displayRelationships();
     }
 
@@ -2101,15 +2204,25 @@ class PresidentGame {
         };
 
         const effect = effects[style];
-        if (effect.media) this.updatePowerCenter('media', effect.media, `Press conference`);
-        if (effect.public) this.updatePowerCenter('public', effect.public, `Press conference`);
-        this.chaos = Math.max(0, Math.min(100, this.chaos + effect.chaos));
-        
-        this.energy -= 5;
-        this.score += 20;
-        
+        const powerEffects = {};
+        const powerReasons = {};
+        if (effect.media) {
+            powerEffects.media = effect.media;
+            powerReasons.media = 'Press conference';
+        }
+        if (effect.public) {
+            powerEffects.public = effect.public;
+            powerReasons.public = 'Press conference';
+        }
+
+        this.state.applyEffects({
+            chaosDelta: effect.chaos || 0,
+            energyDelta: -5,
+            scoreDelta: 20,
+            power: powerEffects
+        }, { source: 'press-response', powerReasons, style });
+
         this.showNotification(`You ${style} the question!`);
-        this.updateDisplay();
         this.currentReporter = null;
         document.getElementById('currentQuestion').textContent = '';
     }
