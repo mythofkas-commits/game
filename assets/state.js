@@ -326,6 +326,8 @@ export class GameState {
     }
 }
 
-if (typeof window !== 'undefined') {
-    window.GameState = GameState;
-}
+// If backward compatibility is needed, use a namespaced global registration:
+// if (typeof window !== 'undefined') {
+//     window.MyApp = window.MyApp || {};
+//     window.MyApp.GameState = GameState;
+// }
