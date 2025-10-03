@@ -1896,7 +1896,13 @@ class PresidentGame {
 
         if (!story) return;
 
-        const match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
+        let match;
+        if (typeof story === 'string') {
+            // Legacy: story is a headline string
+            match = this.currentNewsStories.find(s => s.headline === story);
+        } else if (story && typeof story === 'object') {
+            match = this.currentNewsStories.find(s => s.headline === story.headline && s.source === story.source);
+        }
         this.generateAdaptiveCrisis(match || story);
     }
 
