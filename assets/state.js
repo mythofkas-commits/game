@@ -315,10 +315,7 @@ export class GameState {
 
     #clamp(value, min, max) {
         const num = Number(value);
-        if (!Number.isFinite(num)) return min;
-        if (num < min) return min;
-        if (num > max) return max;
-        return num;
+        return Math.max(min, Math.min(max, Number.isFinite(num) ? num : min));
     }
 
     #normalizeId(id) {
