@@ -3715,6 +3715,8 @@ class PresidentGame {
         if (dismissible) {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'notification-close';
+            closeBtn.type = 'button';
+            closeBtn.setAttribute('aria-label', 'Close notification');
             closeBtn.innerHTML = '×';
             closeBtn.onclick = () => this.dismissNotification(id);
             notifEl.appendChild(closeBtn);
