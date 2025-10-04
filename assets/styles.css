@@ -1345,6 +1345,10 @@ body {
     .top-panels-container {
         grid-template-columns: 1fr;
     }
+    
+    .relationships-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
 }
 
 @media (max-width: 768px) {
@@ -1357,5 +1361,33 @@ body {
         width: calc(100% - 40px);
         left: 20px;
         right: 20px;
+    }
+    
+    .power-notifications-container {
+        width: calc(100% - 40px);
+        left: 20px;
+        right: 20px;
+    }
+    
+    .press-conference,
+    .call-modal,
+    .call-result-modal,
+    .breaking-news-modal {
+        width: 95%;
+        padding: 20px;
+        max-height: 90vh;
+    }
+    
+    .response-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .reporters-row {
+        flex-direction: column;
+    }
+    
+    .battle-scores {
+        flex-direction: column;
+        gap: 10px;
     }
 }
