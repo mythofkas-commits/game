@@ -632,6 +632,11 @@ body {
     display: none;
 }
 
+.press-conference.active {
+    display: block;
+    animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .close-btn {
     position: absolute;
     top: 15px;
@@ -970,6 +975,325 @@ body {
     color: #ffa500;
     display: inline-block;
     margin-top: 10px;
+}
+
+/* POWER CENTER DETAILS */
+.power-center-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.power-icon {
+    font-size: 24px;
+}
+
+.power-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* RELATIONSHIP HISTORY */
+.relationship-history {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.history-toggle {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: #fff;
+    padding: 8px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 10px;
+    transition: all 0.3s;
+}
+
+.history-toggle:hover {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: var(--primary-gold);
+}
+
+/* REPORTERS (Press Conference) */
+.reporter {
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid var(--glass-border);
+    padding: 15px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 150px;
+    text-align: center;
+}
+
+.reporter:hover {
+    background: rgba(255, 215, 0, 0.1);
+    border-color: rgba(255, 215, 0, 0.4);
+    transform: translateY(-3px);
+}
+
+.reporter.selected {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: var(--primary-gold);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+}
+
+.reporter.friendly {
+    border-color: rgba(0, 255, 0, 0.3);
+}
+
+.reporter.hostile {
+    border-color: rgba(255, 0, 0, 0.3);
+}
+
+.reporter.neutral {
+    border-color: rgba(128, 128, 128, 0.3);
+}
+
+/* OPPOSITION TWEETS */
+.opposition-tweet-notification {
+    background: var(--bg-panel);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    border-left: 4px solid rgba(255, 0, 0, 0.6);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+}
+
+.opposition-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.opposition-influence {
+    font-size: 11px;
+    color: #aaa;
+    font-weight: normal;
+}
+
+/* RELATIONSHIP DETAILS */
+.relationship-meters {
+    margin: 15px 0;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.relationship-meters > div {
+    margin: 8px 0;
+    color: #ddd;
+}
+
+.relationship-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-gold);
+    margin-bottom: 8px;
+}
+
+/* TWEET ANALYSIS */
+.political-context {
+    background: rgba(255, 215, 0, 0.1);
+    border-left: 3px solid var(--primary-gold);
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #ddd;
+}
+
+.viral-potential {
+    background: rgba(255, 69, 0, 0.15);
+    border-left: 3px solid rgba(255, 69, 0, 0.6);
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+/* PUBLIC OPINION BATTLE */
+.public-opinion-battle {
+    background: var(--bg-panel);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(138, 43, 226, 0.4);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 15px 0;
+    animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+}
+
+.battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.battle-timer {
+    background: rgba(255, 0, 0, 0.2);
+    color: #ff6b6b;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.battle-scores {
+    display: flex;
+    gap: 15px;
+    margin: 15px 0;
+    justify-content: space-around;
+}
+
+.battle-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* ENDORSEMENTS & INFLUENCERS */
+.endorsement-content {
+    margin: 15px 0;
+    padding: 15px;
+    background: rgba(0, 128, 0, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(0, 255, 0, 0.2);
+}
+
+.endorsement-impact {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #aaa;
+}
+
+.influencer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.influencer-category {
+    background: rgba(255, 215, 0, 0.15);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary-gold);
+}
+
+/* LOADING ENHANCEMENTS */
+.loading-animation {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.loading-progress {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+/* NEWS ENHANCEMENTS */
+.news-relevance {
+    display: inline-block;
+    background: rgba(255, 215, 0, 0.15);
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary-gold);
+    margin-left: 8px;
+}
+
+/* OPPOSITION TWEET DETAILS */
+.opposition-content {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    margin: 10px 0;
+    font-style: italic;
+    color: #ddd;
+}
+
+.opposition-effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* POWER CENTER VALUE */
+.power-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-gold);
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* POWER CENTER ANIMATIONS */
+.power-increase {
+    animation: powerPulseGreen 0.5s ease-out;
+}
+
+.power-decrease {
+    animation: powerPulseRed 0.5s ease-out;
+}
+
+@keyframes powerPulseGreen {
+    0%, 100% {
+        background: rgba(255, 255, 255, 0.05);
+        transform: scale(1);
+    }
+    50% {
+        background: rgba(0, 255, 0, 0.2);
+        transform: scale(1.05);
+    }
+}
+
+@keyframes powerPulseRed {
+    0%, 100% {
+        background: rgba(255, 255, 255, 0.05);
+        transform: scale(1);
+    }
+    50% {
+        background: rgba(255, 0, 0, 0.2);
+        transform: scale(1.05);
+    }
+}
+
+/* NEWS IMPORTANCE */
+.news-item.important-news {
+    background: rgba(255, 215, 0, 0.1);
+    border-color: rgba(255, 215, 0, 0.3);
 }
 
 /* ANIMATIONS */
