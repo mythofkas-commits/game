@@ -719,6 +719,306 @@ body {
     to { opacity: 1; }
 }
 
+/* OPPOSITION AI NOTIFICATIONS */
+.opposition-tweet-notification {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 2px solid #ff6b6b;
+    border-radius: 15px;
+    padding: 15px;
+    max-width: 350px;
+    z-index: 2000;
+    animation: slideInRight 0.5s ease-out;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.opposition-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.opposition-influence {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.opposition-content {
+    color: #fff;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.opposition-effects {
+    font-size: 12px;
+    color: #ffd700;
+}
+
+/* PUBLIC OPINION BATTLES */
+.public-opinion-battle {
+    background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,215,0,0.1));
+    border: 2px solid #ff6b6b;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 15px 0;
+    animation: pulse 2s infinite;
+}
+
+.battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.battle-header h4 {
+    color: #ff6b6b;
+    margin: 0;
+}
+
+.battle-timer {
+    background: #ff6b6b;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.battle-scores {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.score {
+    text-align: center;
+}
+
+.score span {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.player-score span {
+    color: #4CAF50;
+}
+
+.opponent-score span {
+    color: #ff6b6b;
+}
+
+.score-bar {
+    height: 20px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+    transition: width 0.5s ease-out;
+    border-radius: 10px;
+}
+
+.player-score .score-fill {
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+}
+
+.opponent-score .score-fill {
+    background: linear-gradient(90deg, #ff6b6b, #ff8a80);
+}
+
+.battle-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.battle-actions button {
+    background: #ffd700;
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.battle-actions button:hover {
+    background: #ffed4e;
+    transform: scale(1.05);
+}
+
+/* INFLUENCER ENDORSEMENTS */
+.influencer-endorsement {
+    position: fixed;
+    top: 200px;
+    right: 20px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border-radius: 15px;
+    padding: 15px;
+    max-width: 350px;
+    z-index: 2000;
+    animation: slideInRight 0.5s ease-out;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.influencer-endorsement.positive {
+    border: 2px solid #4CAF50;
+}
+
+.influencer-endorsement.negative {
+    border: 2px solid #ff6b6b;
+}
+
+.influencer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.influencer-header strong {
+    color: #ffd700;
+}
+
+.influencer-category {
+    font-size: 12px;
+    color: #aaa;
+    background: rgba(255,255,255,0.1);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.endorsement-content {
+    color: #fff;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.endorsement-impact {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+/* ENHANCED TWEET FEEDBACK */
+.tweet-feedback {
+    background: rgba(29, 161, 242, 0.2);
+    border: 2px solid #1da1f2;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.tweet-feedback strong {
+    color: #1da1f2;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.tweet-feedback .political-context {
+    background: rgba(255,215,0,0.1);
+    border-left: 3px solid #ffd700;
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.tweet-feedback .viral-potential {
+    color: #ff6b6b;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.tweet-feedback .controversy-level {
+    color: #ff9800;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+/* MEDIA MANIPULATION PANEL */
+.media-manipulation-panel {
+    background: rgba(255,255,255,0.05);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px solid rgba(255,215,0,0.3);
+}
+
+.media-manipulation-panel h3 {
+    color: #ffd700;
+    margin-bottom: 15px;
+}
+
+.manipulation-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.manipulation-stat {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.manipulation-stat .stat-label {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 5px;
+}
+
+.manipulation-stat .stat-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+.manipulation-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.manipulation-btn {
+    background: #ffd700;
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 12px;
+}
+
+.manipulation-btn:hover {
+    background: #ffed4e;
+    transform: scale(1.05);
+}
+
+.manipulation-btn:disabled {
+    background: #666;
+    color: #999;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* RESPONSIVE */
 @media (max-width: 1200px) {
     .top-panels-container {

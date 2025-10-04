@@ -146,6 +146,17 @@ class PresidentGame {
         this.pendingCascades = [];
         this.respondingToCrisis = false; // Track if responding to crisis via tweet
         
+        // OPPOSITION AI SYSTEM
+        this.oppositionAI = this.initializeOppositionAI();
+        this.publicOpinionBattles = [];
+        this.influencers = this.initializeInfluencers();
+        this.twitterWars = [];
+        this.mediaManipulation = {
+            narrativeControl: 50,
+            spinDoctors: 3,
+            mediaRelations: 50
+        };
+        
         this.debug = new URLSearchParams(location.search).has('debug');
         this.crisisAIEligibleCount = Number(localStorage.getItem('aiEligibleCount') || 0);
         this.aiShadowMode = true;
@@ -614,6 +625,7 @@ class PresidentGame {
 
         this.gameInterval = setInterval(() => this.gameLoop(), 5000);
         this.newsInterval = setInterval(() => this.checkForNewsUpdate(), 600000);
+        this.oppositionInterval = setInterval(() => this.oppositionAILoop(), 10000); // Check every 10 seconds
 
         // Track game start for analytics
         this.trackEvent('game_started');
@@ -900,37 +912,30 @@ class PresidentGame {
             powerEffects: {},
             chaos: 5,
             energyCost: 5,
-            warnings: []
+            warnings: [],
+            politicalContext: {},
+            socialImplications: {},
+            viralPotential: 0,
+            controversyLevel: 0
         };
 
-        // TONE DETECTION
-        const aggressiveWords = ['attack', 'destroy', 'enemy', 'war', 'fight', 'crush', 'annihilate', 'terrible', 'disaster', 'pathetic', 'loser', 'worst'];
-        const diplomaticWords = ['cooperate', 'together', 'discuss', 'solution', 'partnership', 'dialogue', 'understanding', 'respect'];
-        const profanity = ['damn', 'hell', 'crap', 'shit', 'fuck', 'ass'];
+        // ENHANCED POLITICAL CONTEXT DETECTION
+        const politicalContexts = this.detectPoliticalContext(lower);
+        analysis.politicalContext = politicalContexts;
 
-        let aggressiveScore = 0;
-        let diplomaticScore = 0;
+        // CURRENT US POLITICAL LANDSCAPE AWARENESS
+        const currentIssues = this.analyzeCurrentPoliticalIssues(lower);
+        analysis.socialImplications = currentIssues;
 
-        aggressiveWords.forEach(word => {
-            if (lower.includes(word)) aggressiveScore++;
-        });
-        diplomaticWords.forEach(word => {
-            if (lower.includes(word)) diplomaticScore++;
-        });
+        // ENHANCED TONE DETECTION WITH POLITICAL NUANCE
+        const toneAnalysis = this.analyzePoliticalTone(lower, politicalContexts, currentIssues);
+        analysis.tone = toneAnalysis.tone;
+        analysis.chaos += toneAnalysis.chaosDelta;
+        analysis.controversyLevel = toneAnalysis.controversyLevel;
+        analysis.viralPotential = toneAnalysis.viralPotential;
 
-        if (aggressiveScore > diplomaticScore) {
-            analysis.tone = 'aggressive';
-            analysis.chaos += 15;
-            analysis.powerEffects.military = 10;
-            analysis.powerEffects.media = -10;
-            analysis.powerEffects.public = 15;
-        } else if (diplomaticScore > aggressiveScore) {
-            analysis.tone = 'diplomatic';
-            analysis.chaos -= 5;
-            analysis.powerEffects.congress = 10;
-            analysis.powerEffects.media = 8;
-            analysis.powerEffects.military = -5;
-        }
+        // Apply tone-based power effects
+        Object.assign(analysis.powerEffects, toneAnalysis.powerEffects);
 
         // PROFANITY CHECK
         profanity.forEach(word => {
@@ -1027,18 +1032,797 @@ class PresidentGame {
         return analysis;
     }
 
+    // ENHANCED POLITICAL CONTEXT DETECTION
+    detectPoliticalContext(text) {
+        const contexts = {
+            domestic: false,
+            foreign: false,
+            economic: false,
+            social: false,
+            cultural: false,
+            environmental: false,
+            security: false,
+            healthcare: false,
+            education: false,
+            immigration: false
+        };
+
+        // Current hot-button issues (2024-2025)
+        const contextPatterns = {
+            domestic: ['congress', 'senate', 'house', 'supreme court', 'federal', 'states', 'election', 'voting', 'gerrymandering', 'impeachment'],
+            foreign: ['china', 'russia', 'ukraine', 'taiwan', 'israel', 'palestine', 'iran', 'north korea', 'nato', 'un', 'embassy', 'sanctions'],
+            economic: ['inflation', 'recession', 'gdp', 'unemployment', 'jobs', 'wages', 'taxes', 'deficit', 'debt', 'fed', 'interest rates', 'market'],
+            social: ['abortion', 'lgbtq', 'trans', 'race', 'police', 'protest', 'blm', 'civil rights', 'equality', 'discrimination', 'diversity'],
+            cultural: ['woke', 'cancel culture', 'free speech', 'censorship', 'social media', 'big tech', 'disinformation', 'misinformation'],
+            environmental: ['climate', 'global warming', 'carbon', 'renewable', 'fossil fuels', 'epa', 'green new deal', 'emissions'],
+            security: ['border', 'immigration', 'refugees', 'terrorism', 'cybersecurity', 'defense', 'military', 'veterans'],
+            healthcare: ['medicare', 'medicaid', 'obamacare', 'healthcare', 'insurance', 'pharmaceutical', 'drug prices', 'mental health'],
+            education: ['schools', 'college', 'student debt', 'teachers', 'curriculum', 'critical race theory', 'book bans'],
+            immigration: ['border', 'wall', 'asylum', 'daca', 'visa', 'deportation', 'ice', 'migrants', 'refugees']
+        };
+
+        for (const [context, keywords] of Object.entries(contextPatterns)) {
+            if (keywords.some(keyword => text.includes(keyword))) {
+                contexts[context] = true;
+            }
+        }
+
+        return contexts;
+    }
+
+    // CURRENT US POLITICAL ISSUES ANALYSIS
+    analyzeCurrentPoliticalIssues(text) {
+        const implications = {
+            polarizing: false,
+            bipartisan: false,
+            generational: false,
+            regional: false,
+            classBased: false,
+            identityPolitics: false,
+            conspiracy: false,
+            mainstream: false
+        };
+
+        // Highly polarizing current issues
+        const polarizingTerms = ['abortion', 'trans', 'woke', 'critical race theory', 'defund police', 'border wall', 'election fraud', 'vaccine mandate'];
+        if (polarizingTerms.some(term => text.includes(term))) {
+            implications.polarizing = true;
+            implications.controversyLevel = 'high';
+        }
+
+        // Bipartisan appeal terms
+        const bipartisanTerms = ['infrastructure', 'jobs', 'economy', 'veterans', 'national security', 'healthcare costs'];
+        if (bipartisanTerms.some(term => text.includes(term))) {
+            implications.bipartisan = true;
+        }
+
+        // Generational divide issues
+        const generationalTerms = ['student debt', 'social security', 'climate change', 'social media', 'crypto', 'ai'];
+        if (generationalTerms.some(term => text.includes(term))) {
+            implications.generational = true;
+        }
+
+        // Regional issues
+        const regionalTerms = ['rural', 'urban', 'coastal', 'heartland', 'rust belt', 'sun belt'];
+        if (regionalTerms.some(term => text.includes(term))) {
+            implications.regional = true;
+        }
+
+        // Identity politics
+        const identityTerms = ['white privilege', 'systemic racism', 'patriarchy', 'toxic masculinity', 'cisgender', 'heteronormative'];
+        if (identityTerms.some(term => text.includes(term))) {
+            implications.identityPolitics = true;
+            implications.controversyLevel = 'high';
+        }
+
+        // Conspiracy-adjacent terms
+        const conspiracyTerms = ['deep state', 'establishment', 'elites', 'globalists', 'mainstream media', 'fake news'];
+        if (conspiracyTerms.some(term => text.includes(term))) {
+            implications.conspiracy = true;
+            implications.controversyLevel = 'medium';
+        }
+
+        return implications;
+    }
+
+    // ENHANCED POLITICAL TONE ANALYSIS
+    analyzePoliticalTone(text, contexts, implications) {
+        const result = {
+            tone: 'neutral',
+            chaosDelta: 0,
+            controversyLevel: 0,
+            viralPotential: 0,
+            powerEffects: {}
+        };
+
+        // AGGRESSIVE/PROVOCATIVE TONE DETECTION
+        const aggressivePatterns = [
+            { pattern: /attack|destroy|crush|annihilate|obliterate/, weight: 3, tone: 'aggressive' },
+            { pattern: /pathetic|loser|failure|disaster|nightmare/, weight: 2, tone: 'insulting' },
+            { pattern: /war|battle|fight|combat/, weight: 2, tone: 'combative' },
+            { pattern: /enemy|foe|adversary/, weight: 2, tone: 'hostile' }
+        ];
+
+        // DIPLOMATIC/STATESMAN TONE DETECTION
+        const diplomaticPatterns = [
+            { pattern: /cooperate|collaborate|partnership|alliance/, weight: 2, tone: 'diplomatic' },
+            { pattern: /discuss|dialogue|negotiate|compromise/, weight: 2, tone: 'conciliatory' },
+            { pattern: /unite|together|bipartisan|common ground/, weight: 2, tone: 'unifying' },
+            { pattern: /respect|honor|dignity|integrity/, weight: 1, tone: 'respectful' }
+        ];
+
+        // POPULIST/OUTSIDER TONE DETECTION
+        const populistPatterns = [
+            { pattern: /drain the swamp|establishment|elites|corrupt/, weight: 2, tone: 'populist' },
+            { pattern: /forgotten|left behind|working class|real americans/, weight: 2, tone: 'populist' },
+            { pattern: /rigged|rigged system|broken system/, weight: 2, tone: 'anti-establishment' }
+        ];
+
+        // PROGRESSIVE/LIBERAL TONE DETECTION
+        const progressivePatterns = [
+            { pattern: /equity|inclusion|diversity|representation/, weight: 2, tone: 'progressive' },
+            { pattern: /systemic|institutional|structural change/, weight: 2, tone: 'reformist' },
+            { pattern: /climate justice|social justice|economic justice/, weight: 2, tone: 'activist' }
+        ];
+
+        // CONSERVATIVE/TRADITIONAL TONE DETECTION
+        const conservativePatterns = [
+            { pattern: /traditional values|family values|moral/, weight: 2, tone: 'traditional' },
+            { pattern: /law and order|tough on crime|personal responsibility/, weight: 2, tone: 'authoritarian' },
+            { pattern: /free market|small government|individual liberty/, weight: 2, tone: 'libertarian' }
+        ];
+
+        // Analyze tone patterns
+        const allPatterns = [
+            ...aggressivePatterns,
+            ...diplomaticPatterns,
+            ...populistPatterns,
+            ...progressivePatterns,
+            ...conservativePatterns
+        ];
+
+        let maxScore = 0;
+        let dominantTone = 'neutral';
+
+        allPatterns.forEach(({ pattern, weight, tone }) => {
+            const matches = (text.match(pattern) || []).length;
+            const score = matches * weight;
+            if (score > maxScore) {
+                maxScore = score;
+                dominantTone = tone;
+            }
+        });
+
+        result.tone = dominantTone;
+
+        // Apply tone-specific effects
+        switch (dominantTone) {
+            case 'aggressive':
+            case 'insulting':
+            case 'combative':
+                result.chaosDelta += 20;
+                result.controversyLevel = 8;
+                result.viralPotential = 7;
+                result.powerEffects = { military: 10, media: -15, public: 15 };
+                break;
+            case 'diplomatic':
+            case 'conciliatory':
+            case 'unifying':
+                result.chaosDelta -= 8;
+                result.controversyLevel = 2;
+                result.viralPotential = 3;
+                result.powerEffects = { congress: 12, media: 10, public: 8 };
+                break;
+            case 'populist':
+            case 'anti-establishment':
+                result.chaosDelta += 15;
+                result.controversyLevel = 6;
+                result.viralPotential = 8;
+                result.powerEffects = { public: 20, media: -10, congress: -8 };
+                break;
+            case 'progressive':
+            case 'reformist':
+            case 'activist':
+                result.chaosDelta += 10;
+                result.controversyLevel = 5;
+                result.viralPotential = 6;
+                result.powerEffects = { public: 12, media: 8, science: 10 };
+                break;
+            case 'traditional':
+            case 'authoritarian':
+            case 'libertarian':
+                result.chaosDelta += 5;
+                result.controversyLevel = 4;
+                result.viralPotential = 4;
+                result.powerEffects = { military: 8, industry: 6, public: 6 };
+                break;
+        }
+
+        // Adjust based on political context
+        if (implications.polarizing) {
+            result.chaosDelta += 15;
+            result.controversyLevel += 3;
+            result.viralPotential += 4;
+        }
+
+        if (implications.bipartisan) {
+            result.chaosDelta -= 5;
+            result.controversyLevel = Math.max(0, result.controversyLevel - 2);
+        }
+
+        if (implications.conspiracy) {
+            result.chaosDelta += 12;
+            result.controversyLevel += 2;
+            result.viralPotential += 3;
+            result.powerEffects.media = (result.powerEffects.media || 0) - 10;
+        }
+
+        return result;
+    }
+
+    // OPPOSITION AI LOOP
+    oppositionAILoop() {
+        const now = Date.now();
+        
+        // Check if any opposition should respond to recent news or player tweets
+        this.oppositionAI.forEach(opponent => {
+            if (now - opponent.lastTweet > opponent.responseTime && this.rand() < 0.3) {
+                this.generateOppositionResponse(opponent);
+            }
+        });
+
+        // Check for influencer endorsements
+        this.checkInfluencerEndorsements();
+
+        // Update public opinion battles
+        this.updatePublicOpinionBattles();
+
+        // Check for Twitter war escalations
+        this.updateTwitterWars();
+    }
+
+    // GENERATE OPPOSITION RESPONSES
+    generateOppositionResponse(opponent) {
+        const recentNews = this.currentNewsStories.slice(0, 3);
+        const recentPlayerTweets = this.history.tweets.slice(-2);
+        
+        let responseTarget = null;
+        let responseType = 'news';
+
+        // 60% chance to respond to news, 40% to player tweets
+        if (this.rand() < 0.6 && recentNews.length > 0) {
+            responseTarget = recentNews[Math.floor(this.rand() * recentNews.length)];
+        } else if (recentPlayerTweets.length > 0) {
+            responseTarget = recentPlayerTweets[Math.floor(this.rand() * recentPlayerTweets.length)];
+            responseType = 'tweet';
+        }
+
+        if (!responseTarget) return;
+
+        const response = this.createOppositionTweet(opponent, responseTarget, responseType);
+        this.processOppositionTweet(opponent, response);
+    }
+
+    // CREATE OPPOSITION TWEET
+    createOppositionTweet(opponent, target, type) {
+        const templates = this.getOppositionTemplates(opponent, type);
+        const template = templates[Math.floor(this.rand() * templates.length)];
+        
+        let tweet = template.text;
+        
+        // Replace placeholders
+        if (type === 'news') {
+            tweet = tweet.replace('{news}', target.headline.substring(0, 50) + '...');
+        } else {
+            tweet = tweet.replace('{tweet}', target.content.substring(0, 30) + '...');
+        }
+
+        // Add opponent's signature style
+        if (opponent.personality.direct > 80) {
+            tweet = tweet.replace(/\./g, '!');
+        }
+
+        return {
+            content: tweet,
+            target: target,
+            type: type,
+            timestamp: Date.now(),
+            opponent: opponent
+        };
+    }
+
+    // OPPOSITION TWEET TEMPLATES
+    getOppositionTemplates(opponent, type) {
+        const baseTemplates = {
+            progressive: {
+                news: [
+                    "This is exactly why we need {news} - the status quo isn't working!",
+                    "While others dither, real leaders would address {news} head-on.",
+                    "{news} shows the urgent need for systemic change.",
+                    "This is what happens when we don't prioritize {news} - working families suffer."
+                ],
+                tweet: [
+                    "That's a dangerous position on {tweet} - we need facts, not fear.",
+                    "This kind of rhetoric about {tweet} is exactly what's wrong with politics.",
+                    "Instead of attacking, let's focus on solutions for {tweet}.",
+                    "The American people deserve better than this response to {tweet}."
+                ]
+            },
+            conservative: {
+                news: [
+                    "This {news} is exactly what I've been warning about.",
+                    "The left's policies have led to {news} - time for real leadership.",
+                    "While the establishment ignores {news}, I'm fighting for solutions.",
+                    "This is why we need strong leadership on {news} - not weak compromises."
+                ],
+                tweet: [
+                    "This response to {tweet} shows a complete lack of understanding.",
+                    "The American people see through this spin on {tweet}.",
+                    "Instead of deflecting on {tweet}, let's address the real issues.",
+                    "This is exactly the kind of response that got us into this mess with {tweet}."
+                ]
+            },
+            populist: {
+                news: [
+                    "The elites don't care about {news} - but I do!",
+                    "This {news} proves the system is rigged against working Americans.",
+                    "While DC insiders ignore {news}, I'm fighting for you!",
+                    "The establishment created this {news} - time for real change!"
+                ],
+                tweet: [
+                    "This is exactly the kind of elite thinking that created {tweet}.",
+                    "The swamp doesn't understand {tweet} - but the American people do!",
+                    "This response to {tweet} shows how out of touch they are.",
+                    "While they play games with {tweet}, I'm fighting for real solutions."
+                ]
+            }
+        };
+
+        return baseTemplates[opponent.ideology]?.[type] || baseTemplates.progressive[type];
+    }
+
+    // PROCESS OPPOSITION TWEET
+    processOppositionTweet(opponent, response) {
+        opponent.lastTweet = Date.now();
+        
+        // Analyze the opposition tweet for effects
+        const analysis = this.analyzeTweet(response.content);
+        
+        // Create public opinion battle if this is a direct response to player
+        if (response.type === 'tweet') {
+            this.createPublicOpinionBattle(opponent, response, analysis);
+        }
+
+        // Show notification
+        this.showOppositionTweet(opponent, response, analysis);
+
+        // Apply effects to power centers
+        const powerEffects = {};
+        const powerReasons = {};
+        Object.entries(analysis.powerEffects).forEach(([center, change]) => {
+            if (Math.abs(change) > 0) {
+                powerEffects[center] = -change * 0.5; // Opposition effects are negative for player
+                powerReasons[center] = `${opponent.name}'s response`;
+            }
+        });
+
+        this.state.applyEffects({
+            chaosDelta: analysis.chaos * 0.3,
+            power: powerEffects
+        }, { source: 'opposition-tweet', powerReasons, opponent: opponent.name });
+
+        // Track for analytics
+        this.trackEvent('opposition_tweet', {
+            opponent: opponent.name,
+            content: response.content,
+            analysis: analysis
+        });
+    }
+
+    // SHOW OPPOSITION TWEET NOTIFICATION
+    showOppositionTweet(opponent, response, analysis) {
+        const notif = document.createElement('div');
+        notif.className = 'opposition-tweet-notification';
+        notif.innerHTML = `
+            <div class="opposition-header">
+                <strong>${opponent.name} ${opponent.twitterHandle}</strong>
+                <span class="opposition-influence">${opponent.followers.toLocaleString()} followers</span>
+            </div>
+            <div class="opposition-content">${this.sanitizeText(response.content)}</div>
+            <div class="opposition-effects">
+                ${analysis.controversyLevel > 5 ? '🔥 High controversy' : ''}
+                ${analysis.viralPotential > 6 ? '📈 Going viral' : ''}
+            </div>
+        `;
+        
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 8000);
+    }
+
+    // PUBLIC OPINION BATTLES
+    createPublicOpinionBattle(opponent, response, analysis) {
+        const battle = {
+            id: Date.now(),
+            opponent: opponent,
+            topic: this.extractTopic(response.content),
+            playerScore: 50,
+            opponentScore: 50,
+            startTime: Date.now(),
+            duration: 300000, // 5 minutes
+            viralMultiplier: analysis.viralPotential / 10,
+            controversyLevel: analysis.controversyLevel
+        };
+
+        this.publicOpinionBattles.push(battle);
+        this.showPublicOpinionBattle(battle);
+    }
+
+    // EXTRACT TOPIC FROM TWEET
+    extractTopic(content) {
+        const topics = {
+            'economy': ['economy', 'jobs', 'inflation', 'market', 'recession'],
+            'immigration': ['border', 'immigration', 'asylum', 'refugees'],
+            'healthcare': ['healthcare', 'medicare', 'insurance', 'drugs'],
+            'climate': ['climate', 'environment', 'carbon', 'renewable'],
+            'foreign policy': ['china', 'russia', 'ukraine', 'nato', 'war'],
+            'social issues': ['abortion', 'lgbtq', 'race', 'police', 'protest']
+        };
+
+        const lower = content.toLowerCase();
+        for (const [topic, keywords] of Object.entries(topics)) {
+            if (keywords.some(keyword => lower.includes(keyword))) {
+                return topic;
+            }
+        }
+        return 'general politics';
+    }
+
+    // SHOW PUBLIC OPINION BATTLE
+    showPublicOpinionBattle(battle) {
+        const battleEl = document.createElement('div');
+        battleEl.className = 'public-opinion-battle';
+        battleEl.innerHTML = `
+            <div class="battle-header">
+                <h4>🗳️ Public Opinion Battle: ${battle.topic}</h4>
+                <div class="battle-timer">${Math.ceil(battle.duration / 1000)}s</div>
+            </div>
+            <div class="battle-scores">
+                <div class="score player-score">
+                    <span>You: ${battle.playerScore}%</span>
+                    <div class="score-bar"><div class="score-fill" style="width: ${battle.playerScore}%"></div></div>
+                </div>
+                <div class="score opponent-score">
+                    <span>${battle.opponent.name}: ${battle.opponentScore}%</span>
+                    <div class="score-bar"><div class="score-fill" style="width: ${battle.opponentScore}%"></div></div>
+                </div>
+            </div>
+            <div class="battle-actions">
+                <button onclick="game.engageInBattle('${battle.id}', 'counter')">Counter Attack</button>
+                <button onclick="game.engageInBattle('${battle.id}', 'deflect')">Deflect</button>
+                <button onclick="game.engageInBattle('${battle.id}', 'ignore')">Ignore</button>
+            </div>
+        `;
+        
+        document.getElementById('crisisPanel').appendChild(battleEl);
+        
+        // Auto-remove after duration
+        setTimeout(() => {
+            if (battleEl.parentNode) {
+                this.resolvePublicOpinionBattle(battle);
+                battleEl.remove();
+            }
+        }, battle.duration);
+    }
+
+    // ENGAGE IN PUBLIC OPINION BATTLE
+    engageInBattle(battleId, action) {
+        const battle = this.publicOpinionBattles.find(b => b.id == battleId);
+        if (!battle) return;
+
+        const effects = {
+            counter: { player: 15, opponent: -10, chaos: 10 },
+            deflect: { player: 5, opponent: -5, chaos: 5 },
+            ignore: { player: -5, opponent: 10, chaos: -5 }
+        };
+
+        const effect = effects[action];
+        battle.playerScore = Math.max(0, Math.min(100, battle.playerScore + effect.player));
+        battle.opponentScore = Math.max(0, Math.min(100, battle.opponentScore + effect.opponent));
+
+        this.state.applyEffects({
+            chaosDelta: effect.chaos
+        }, { source: 'public-opinion-battle', action });
+
+        this.showNotification(`🗳️ ${action} action in ${battle.topic} battle!`);
+    }
+
+    // RESOLVE PUBLIC OPINION BATTLE
+    resolvePublicOpinionBattle(battle) {
+        const winner = battle.playerScore > battle.opponentScore ? 'player' : 'opponent';
+        const margin = Math.abs(battle.playerScore - battle.opponentScore);
+        
+        if (winner === 'player') {
+            this.state.applyEffects({
+                power: { public: margin * 0.5 },
+                scoreDelta: margin * 10
+            }, { source: 'public-opinion-victory', topic: battle.topic });
+            this.showNotification(`🏆 Victory in ${battle.topic} opinion battle! +${margin * 0.5} public support`);
+        } else {
+            this.state.applyEffects({
+                power: { public: -margin * 0.3 },
+                chaosDelta: margin * 0.2
+            }, { source: 'public-opinion-defeat', topic: battle.topic });
+            this.showNotification(`💥 Lost ${battle.topic} opinion battle to ${battle.opponent.name}`);
+        }
+
+        // Remove from active battles
+        this.publicOpinionBattles = this.publicOpinionBattles.filter(b => b.id !== battle.id);
+    }
+
+    // UPDATE PUBLIC OPINION BATTLES
+    updatePublicOpinionBattles() {
+        this.publicOpinionBattles.forEach(battle => {
+            const elapsed = Date.now() - battle.startTime;
+            if (elapsed >= battle.duration) {
+                this.resolvePublicOpinionBattle(battle);
+            }
+        });
+    }
+
+    // CHECK INFLUENCER ENDORSEMENTS
+    checkInfluencerEndorsements() {
+        this.influencers.forEach(influencer => {
+            if (Date.now() - influencer.last_endorsement > 300000 && this.rand() < 0.1) { // 10% chance every 5 minutes
+                this.generateInfluencerEndorsement(influencer);
+            }
+        });
+    }
+
+    // GENERATE INFLUENCER ENDORSEMENT
+    generateInfluencerEndorsement(influencer) {
+        const endorsement = {
+            influencer: influencer,
+            type: this.rand() < 0.5 ? 'positive' : 'negative',
+            topic: this.getRandomTopic(),
+            timestamp: Date.now()
+        };
+
+        influencer.last_endorsement = Date.now();
+
+        const effect = endorsement.type === 'positive' ? 
+            influencer.endorsement_value : -influencer.endorsement_value;
+
+        this.state.applyEffects({
+            power: { public: effect },
+            chaosDelta: endorsement.type === 'negative' ? 5 : -2
+        }, { source: 'influencer-endorsement', influencer: influencer.name });
+
+        this.showInfluencerEndorsement(endorsement);
+    }
+
+    // SHOW INFLUENCER ENDORSEMENT
+    showInfluencerEndorsement(endorsement) {
+        const notif = document.createElement('div');
+        notif.className = `influencer-endorsement ${endorsement.type}`;
+        notif.innerHTML = `
+            <div class="influencer-header">
+                <strong>${endorsement.influencer.name}</strong>
+                <span class="influencer-category">${endorsement.influencer.category}</span>
+            </div>
+            <div class="endorsement-content">
+                ${endorsement.type === 'positive' ? '✅ Endorses' : '❌ Criticizes'} your stance on ${endorsement.topic}
+            </div>
+            <div class="endorsement-impact">
+                ${endorsement.type === 'positive' ? '+' : ''}${endorsement.influencer.endorsement_value} public opinion
+            </div>
+        `;
+        
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 6000);
+    }
+
+    // GET RANDOM TOPIC
+    getRandomTopic() {
+        const topics = ['economy', 'immigration', 'healthcare', 'climate', 'foreign policy', 'social issues'];
+        return topics[Math.floor(this.rand() * topics.length)];
+    }
+
+    // UPDATE TWITTER WARS
+    updateTwitterWars() {
+        // Implementation for Twitter war escalations
+        // This would track ongoing conflicts and escalate them
+    }
+
+    // OPPOSITION AI SYSTEM
+    initializeOppositionAI() {
+        return [
+            {
+                name: 'Sen. Elizabeth Warren',
+                party: 'Democrat',
+                ideology: 'progressive',
+                twitterHandle: '@ewarren',
+                followers: 2800000,
+                influence: 85,
+                aggression: 60,
+                lastTweet: 0,
+                personality: {
+                    direct: 80,
+                    policy_focused: 90,
+                    populist: 70,
+                    combative: 60
+                },
+                currentIssues: ['economic inequality', 'corporate power', 'climate change'],
+                responseTime: 30000 // 30 seconds average
+            },
+            {
+                name: 'Rep. Marjorie Taylor Greene',
+                party: 'Republican',
+                ideology: 'populist',
+                twitterHandle: '@mtgreenee',
+                followers: 1200000,
+                influence: 75,
+                aggression: 95,
+                lastTweet: 0,
+                personality: {
+                    direct: 95,
+                    policy_focused: 40,
+                    populist: 95,
+                    combative: 95
+                },
+                currentIssues: ['border security', 'election integrity', 'cultural issues'],
+                responseTime: 15000 // 15 seconds average
+            },
+            {
+                name: 'Gov. Ron DeSantis',
+                party: 'Republican',
+                ideology: 'conservative',
+                twitterHandle: '@rondesantis',
+                followers: 1800000,
+                influence: 80,
+                aggression: 70,
+                lastTweet: 0,
+                personality: {
+                    direct: 70,
+                    policy_focused: 80,
+                    populist: 60,
+                    combative: 70
+                },
+                currentIssues: ['education', 'law enforcement', 'economic policy'],
+                responseTime: 45000 // 45 seconds average
+            },
+            {
+                name: 'Rep. Alexandria Ocasio-Cortez',
+                party: 'Democrat',
+                ideology: 'progressive',
+                twitterHandle: '@aoc',
+                followers: 3500000,
+                influence: 90,
+                aggression: 75,
+                lastTweet: 0,
+                personality: {
+                    direct: 85,
+                    policy_focused: 85,
+                    populist: 80,
+                    combative: 75
+                },
+                currentIssues: ['climate justice', 'healthcare', 'economic reform'],
+                responseTime: 20000 // 20 seconds average
+            }
+        ];
+    }
+
+    // INFLUENCER SYSTEM
+    initializeInfluencers() {
+        return [
+            {
+                name: 'Elon Musk',
+                category: 'tech_ceo',
+                followers: 150000000,
+                influence: 95,
+                political_leaning: 'libertarian',
+                endorsement_value: 25,
+                controversy_level: 8,
+                last_endorsement: 0
+            },
+            {
+                name: 'Taylor Swift',
+                category: 'entertainment',
+                followers: 95000000,
+                influence: 90,
+                political_leaning: 'progressive',
+                endorsement_value: 30,
+                controversy_level: 2,
+                last_endorsement: 0
+            },
+            {
+                name: 'Joe Rogan',
+                category: 'podcast',
+                followers: 14000000,
+                influence: 80,
+                political_leaning: 'independent',
+                endorsement_value: 20,
+                controversy_level: 6,
+                last_endorsement: 0
+            },
+            {
+                name: 'Ben Shapiro',
+                category: 'media',
+                followers: 5000000,
+                influence: 75,
+                political_leaning: 'conservative',
+                endorsement_value: 15,
+                controversy_level: 7,
+                last_endorsement: 0
+            },
+            {
+                name: 'Rachel Maddow',
+                category: 'media',
+                followers: 3000000,
+                influence: 70,
+                political_leaning: 'progressive',
+                endorsement_value: 18,
+                controversy_level: 4,
+                last_endorsement: 0
+            }
+        ];
+    }
+
     showTweetFeedback(analysis) {
         const feedback = document.createElement('div');
         feedback.className = 'tweet-feedback';
         
         const header = document.createElement('strong');
-        header.textContent = 'Tweet Analysis:';
+        header.textContent = 'Enhanced Tweet Analysis:';
         feedback.appendChild(header);
         feedback.appendChild(document.createElement('br'));
 
+        // Enhanced tone analysis
         const toneLine = document.createTextNode(`Tone: ${analysis.tone.toUpperCase()} | Chaos: +${analysis.chaos}`);
         feedback.appendChild(toneLine);
         feedback.appendChild(document.createElement('br'));
+
+        // Political context
+        if (analysis.politicalContext) {
+            const activeContexts = Object.entries(analysis.politicalContext)
+                .filter(([_, active]) => active)
+                .map(([context, _]) => context);
+            
+            if (activeContexts.length > 0) {
+                const contextDiv = document.createElement('div');
+                contextDiv.className = 'political-context';
+                contextDiv.textContent = `Political Context: ${activeContexts.join(', ')}`;
+                feedback.appendChild(contextDiv);
+            }
+        }
+
+        // Social implications
+        if (analysis.socialImplications) {
+            const implications = Object.entries(analysis.socialImplications)
+                .filter(([_, active]) => active)
+                .map(([implication, _]) => implication);
+            
+            if (implications.length > 0) {
+                const implicationsDiv = document.createElement('div');
+                implicationsDiv.className = 'political-context';
+                implicationsDiv.textContent = `Social Impact: ${implications.join(', ')}`;
+                feedback.appendChild(implicationsDiv);
+            }
+        }
+
+        // Viral potential and controversy
+        if (analysis.viralPotential > 5) {
+            const viralDiv = document.createElement('div');
+            viralDiv.className = 'viral-potential';
+            viralDiv.textContent = `📈 High viral potential (${analysis.viralPotential}/10)`;
+            feedback.appendChild(viralDiv);
+        }
+
+        if (analysis.controversyLevel > 5) {
+            const controversyDiv = document.createElement('div');
+            controversyDiv.className = 'controversy-level';
+            controversyDiv.textContent = `🔥 High controversy level (${analysis.controversyLevel}/10)`;
+            feedback.appendChild(controversyDiv);
+        }
 
         if (analysis.warnings.length > 0) {
             const warnLine = document.createTextNode(`⚠️ ${analysis.warnings.join(' ')}`);
@@ -1061,7 +1845,7 @@ class PresidentGame {
 
         document.getElementById('tweetFeedback').appendChild(feedback);
 
-        setTimeout(() => feedback.remove(), 5000);
+        setTimeout(() => feedback.remove(), 8000); // Longer display time for enhanced analysis
     }
 
     focusTwitter() {
