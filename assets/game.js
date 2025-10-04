@@ -181,6 +181,351 @@ class PresidentGame {
         };
     }
 
+    // ============= BACKSTORY GENERATION =============
+    async generateAllBackstories() {
+        for (const rel of this.relationships) {
+            await this.generateRelationshipBackstory(rel);
+        }
+        this.displayRelationships();
+    }
+
+    async generateRelationshipBackstory(rel) {
+        if (!rel) return;
+        try {
+            const ai = await this.fetchAINarrative({
+                generationType: 'backstory',
+                headline: rel.name,
+                playerContext: {
+                    relationship: {
+                        name: rel.name,
+                        personality: rel.personality,
+                        role: rel.role,
+                        trust: rel.trust,
+                        respect: rel.respect,
+                        fear: rel.fear
+                    }
+                }
+            });
+            const backstory = Array.isArray(ai?.backstory)
+                ? ai.backstory
+                : Array.isArray(ai?.narrative?.backstory)
+                    ? ai.narrative.backstory
+                    : [];
+            if (backstory.length) {
+                rel.history = backstory.map(event => ({
+                    event: typeof event.event === 'string' ? event.event : typeof event.title === 'string' ? event.title : '',
+                    trustChange: Number.isFinite(Number(event.trustChange)) ? Number(event.trustChange) : 0,
+                    respectChange: Number.isFinite(Number(event.respectChange)) ? Number(event.respectChange) : 0,
+                    fearChange: Number.isFinite(Number(event.fearChange)) ? Number(event.fearChange) : 0,
+                    timestamp: event.timestamp ? new Date(event.timestamp).getTime() : Date.now()
+                }));
+                return;
+            }
+        } catch (e) {
+            console.warn('Failed to generate backstory for', rel.name, e);
+        }
+        this.generateFallbackBackstory(rel);
+    }
+
+    generateFallbackBackstory(rel) {
+        if (!rel) return;
+        const events = [];
+        let totalTrust = 0;
+        let totalRespect = 0;
+        let totalFear = 0;
+        const numEvents = 3 + Math.floor(this.rand() * 3);
+        for (let i = 0; i < numEvents; i++) {
+            const event = this.generatePlausibleEvent(rel, i, numEvents);
+            events.push(event);
+            totalTrust += event.trustChange;
+            totalRespect += event.respectChange;
+            totalFear += event.fearChange;
+        }
+        if (events.length) {
+            events[events.length - 1].trustChange += rel.trust - totalTrust;
+            events[events.length - 1].respectChange += rel.respect - totalRespect;
+            events[events.length - 1].fearChange += rel.fear - totalFear;
+        }
+        rel.history = events;
+    }
+
+    generatePlausibleEvent(rel, index, total) {
+        const personalities = {
+            strategic: ['negotiated a compromise', 'outmaneuvered opponents', 'formed alliances'],
+            calculating: ['weighed options carefully', 'made pragmatic decisions', 'avoided unnecessary risks'],
+            ideological: ['stood firm on principles', 'challenged the status quo', 'inspired followers'],
+            ruthless: ['eliminated threats', 'seized opportunities', 'showed no mercy'],
+            patient: ['waited for the right moment', 'built long-term strategies', 'endured setbacks'],
+            pragmatic: ['adapted to circumstances', 'found middle ground', 'delivered results']
+        };
+        const options = personalities[rel.personality] || ['took decisive action'];
+        const action = options[Math.floor(this.rand() * options.length)];
+        const randomDelta = () => Math.round((this.rand() - 0.5) * 20);
+        const monthsAgo = total - index;
+        return {
+            event: `${rel.name} ${action} during a key political moment`,
+            trustChange: randomDelta(),
+            respectChange: randomDelta(),
+            fearChange: randomDelta(),
+            timestamp: Date.now() - monthsAgo * 30 * 24 * 60 * 60 * 1000
+        };
+    }
+
+    // ============= RELATIONSHIP CALL SYSTEM =============
+    getRelevantNewsForLeader(rel) {
+        if (!rel) return [];
+        const leaderCategories = {
+            'Chuck Schumer': ['domestic', 'healthcare', 'scandal'],
+            'John Thune': ['domestic', 'economy', 'military'],
+            'Mike Johnson': ['domestic', 'military', 'congress'],
+            'Vladimir Putin': ['foreign', 'military', 'intelligence'],
+            'Xi Jinping': ['foreign', 'economy', 'military'],
+            'Keir Starmer': ['foreign', 'economy', 'nato']
+        };
+        const categories = leaderCategories[rel.name] || [];
+        if (!categories.length) return this.currentNewsStories.slice();
+        return this.currentNewsStories.filter(story => categories.includes(story.category));
+    }
+
+    getCurrentIssueForLeader(rel) {
+        const relevant = this.getRelevantNewsForLeader(rel) || [];
+        if (relevant.length) {
+            const story = relevant[Math.floor(this.rand() * relevant.length)];
+            if (story?.headline) {
+                return `${story.headline.substring(0, 50)}...`;
+            }
+        }
+        if (Array.isArray(rel.currentIssues) && rel.currentIssues.length) {
+            return rel.currentIssues[Math.floor(this.rand() * rel.currentIssues.length)];
+        }
+        return 'urgent developments';
+    }
+
+    showCallModal(rel) {
+        if (!rel) return;
+        const existing = document.querySelector('.call-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'call-modal';
+
+        const issue = this.getCurrentIssueForLeader(rel);
+        const safeIssue = this.sanitizeText(issue);
+
+        const content = document.createElement('div');
+        content.className = 'call-content';
+
+        const title = document.createElement('h2');
+        title.textContent = `📞 Call with ${rel.name}`;
+        content.appendChild(title);
+
+        const role = document.createElement('p');
+        role.innerHTML = `<strong>Role:</strong> ${this.sanitizeText(rel.role)}`;
+        content.appendChild(role);
+
+        const personality = document.createElement('p');
+        personality.innerHTML = `<strong>Personality:</strong> ${this.sanitizeText(rel.personality)}`;
+        content.appendChild(personality);
+
+        const meters = document.createElement('div');
+        meters.className = 'relationship-meters';
+        ['Trust', 'Respect', 'Fear'].forEach((label, index) => {
+            const value = [rel.trust, rel.respect, rel.fear][index] ?? 0;
+            const meterItem = document.createElement('div');
+            meterItem.textContent = `${label}: ${value}%`;
+            meters.appendChild(meterItem);
+        });
+        content.appendChild(meters);
+
+        const issueEl = document.createElement('p');
+        issueEl.innerHTML = `<strong>Issue:</strong> ${safeIssue}`;
+        content.appendChild(issueEl);
+
+        const optionsWrap = document.createElement('div');
+        optionsWrap.className = 'call-options';
+        const approaches = [
+            { approach: 'diplomatic', label: '🤝 Diplomatic' },
+            { approach: 'firm', label: '💪 Firm' },
+            { approach: 'aggressive', label: '⚔️ Aggressive' },
+            { approach: 'concessions', label: '🤲 Concessions' }
+        ];
+        approaches.forEach(({ approach, label }) => {
+            const btn = document.createElement('button');
+            btn.className = 'call-option';
+            btn.textContent = label;
+            btn.addEventListener('click', () => this.handleCallApproach(rel, approach, modal, issue));
+            optionsWrap.appendChild(btn);
+        });
+        content.appendChild(optionsWrap);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-modal';
+        closeBtn.textContent = 'Cancel';
+        closeBtn.addEventListener('click', () => modal.remove());
+        content.appendChild(closeBtn);
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+    }
+
+    handleCallApproach(rel, approach, modal, issue) {
+        if (modal) modal.remove();
+        const outcome = this.calculateCallOutcome(rel, approach);
+        this.showCallResult(rel, approach, outcome, issue);
+
+        this.updateRelationshipValues(rel.name, outcome.trustChange, outcome.respectChange, outcome.fearChange);
+        if (!Array.isArray(rel.history)) rel.history = [];
+        rel.history.push({
+            event: `Phone call: ${approach} approach on ${issue}`,
+            trustChange: outcome.trustChange,
+            respectChange: outcome.respectChange,
+            fearChange: outcome.fearChange,
+            timestamp: Date.now()
+        });
+
+        this.history.phoneCalls.push({
+            caller: rel.name,
+            approach,
+            issue,
+            result: outcome.result,
+            timestamp: Date.now()
+        });
+
+        this.trackEvent('phone_call', { leader: rel.name, approach, result: outcome.result, issue });
+
+        const stateEffects = outcome.result === 'success'
+            ? { chaosDelta: -10, energyDelta: -10, scoreDelta: 50 }
+            : { chaosDelta: 10, energyDelta: -10 };
+        this.state.applyEffects(stateEffects, { source: 'phone-call', leader: rel.name, approach, result: outcome.result });
+
+        this.displayRelationships();
+    }
+
+    calculateCallOutcome(rel, approach) {
+        let modifier = 0;
+        switch (rel.personality) {
+            case 'strategic':
+                if (approach === 'diplomatic') modifier += 0.4;
+                if (approach === 'firm') modifier += 0.2;
+                if (approach === 'aggressive') modifier -= 0.3;
+                break;
+            case 'calculating':
+                if (approach === 'concessions') modifier += 0.4;
+                if (approach === 'diplomatic') modifier += 0.2;
+                break;
+            case 'ideological':
+                if (approach === 'firm') modifier += 0.4;
+                if (approach === 'aggressive') modifier += 0.2;
+                if (approach === 'concessions') modifier -= 0.3;
+                break;
+            case 'ruthless':
+                if (approach === 'aggressive') modifier += 0.4;
+                if (approach === 'firm') modifier += 0.2;
+                if (approach === 'diplomatic') modifier -= 0.2;
+                break;
+            case 'patient':
+                if (approach === 'diplomatic') modifier += 0.4;
+                if (approach === 'firm') modifier += 0.1;
+                if (approach === 'aggressive') modifier -= 0.4;
+                break;
+            case 'pragmatic':
+                modifier += 0.2;
+                break;
+            default:
+                break;
+        }
+        const baseChance = Math.min(Math.max(rel.trust / 100, 0), 1);
+        const successThreshold = Math.min(Math.max(baseChance + modifier, 0), 1);
+        const success = this.rand() < successThreshold;
+        if (success) {
+            return {
+                result: 'success',
+                trustChange: 5 + Math.floor(this.rand() * 10),
+                respectChange: 5 + Math.floor(this.rand() * 10),
+                fearChange: -5 + Math.floor(this.rand() * 5)
+            };
+        }
+        return {
+            result: 'failure',
+            trustChange: -(10 + Math.floor(this.rand() * 10)),
+            respectChange: -(5 + Math.floor(this.rand() * 10)),
+            fearChange: 5 + Math.floor(this.rand() * 10)
+        };
+    }
+
+    async showCallResult(rel, approach, outcome, issue) {
+        let dialogue = 'Standard response.';
+        try {
+            const ai = await this.fetchAINarrative({
+                generationType: 'callDialogue',
+                headline: issue,
+                playerContext: {
+                    relationship: {
+                        name: rel.name,
+                        personality: rel.personality,
+                        role: rel.role,
+                        trust: rel.trust,
+                        respect: rel.respect,
+                        fear: rel.fear
+                    },
+                    approach,
+                    outcome,
+                    issue
+                }
+            });
+            if (ai?.narrative && typeof ai.narrative === 'string') {
+                dialogue = ai.narrative;
+            }
+        } catch (e) {
+            console.warn('AI dialogue failed', e);
+        }
+        const existing = document.querySelector('.call-result-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'call-result-modal';
+
+        const content = document.createElement('div');
+        content.className = 'call-result-content';
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Call Result';
+        content.appendChild(heading);
+
+        const summary = document.createElement('p');
+        summary.innerHTML = `You took a <strong>${this.sanitizeText(approach)}</strong> approach with ${this.sanitizeText(rel.name)} regarding <strong>${this.sanitizeText(issue)}</strong>.`;
+        content.appendChild(summary);
+
+        const response = document.createElement('p');
+        response.innerHTML = `<strong>Response:</strong> ${this.sanitizeText(dialogue)}`;
+        content.appendChild(response);
+
+        const outcomeLine = document.createElement('p');
+        outcomeLine.innerHTML = `<strong>Outcome:</strong> ${outcome.result === 'success' ? 'Successful negotiation!' : 'They rejected your proposal.'}`;
+        content.appendChild(outcomeLine);
+
+        const trustLine = document.createElement('p');
+        trustLine.innerHTML = `Trust: <span style="color: ${outcome.trustChange > 0 ? 'green' : 'red'}">${outcome.trustChange > 0 ? '+' : ''}${outcome.trustChange}%</span>`;
+        content.appendChild(trustLine);
+
+        const respectLine = document.createElement('p');
+        respectLine.innerHTML = `Respect: <span style="color: ${outcome.respectChange > 0 ? 'green' : 'red'}">${outcome.respectChange > 0 ? '+' : ''}${outcome.respectChange}%</span>`;
+        content.appendChild(respectLine);
+
+        const fearLine = document.createElement('p');
+        fearLine.innerHTML = `Fear: <span style="color: ${outcome.fearChange > 0 ? 'green' : 'red'}">${outcome.fearChange > 0 ? '+' : ''}${outcome.fearChange}%</span>`;
+        content.appendChild(fearLine);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-result';
+        closeBtn.textContent = 'OK';
+        closeBtn.addEventListener('click', () => modal.remove());
+        content.appendChild(closeBtn);
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+    }
+
     get day() {
         return this.state.snapshot.day;
     }
@@ -536,6 +881,21 @@ class PresidentGame {
                 };
             }
 
+            if (payload.generationType === 'backstory') {
+                return {
+                    success: true,
+                    backstory: [
+                        { event: 'Met during a tense budget negotiation', trustChange: 10, respectChange: 8, fearChange: -3, timestamp: Date.now() - 90 * 24 * 60 * 60 * 1000 },
+                        { event: 'Clashed over committee assignments', trustChange: -6, respectChange: -4, fearChange: 5, timestamp: Date.now() - 45 * 24 * 60 * 60 * 1000 },
+                        { event: 'Brokered a last-minute vote trade', trustChange: 8, respectChange: 6, fearChange: -2, timestamp: Date.now() - 10 * 24 * 60 * 60 * 1000 }
+                    ]
+                };
+            }
+
+            if (payload.generationType === 'callDialogue') {
+                return { success: true, narrative: 'We will consider your proposal, but expect concessions soon.' };
+            }
+
             return {
                 narrative: {
                     headline: 'Test Narrative',
@@ -553,10 +913,14 @@ class PresidentGame {
         return res.json();
     }
 
-    async fetchAINarrative({ headline, generationType }) {
+    async fetchAINarrative({ headline = '', generationType, playerContext } = {}) {
+        if (!generationType) throw new Error('generationType required');
+        const baseContext = this.getPlayerContextForAI();
+        const context = playerContext ? { ...baseContext, ...playerContext } : baseContext;
+
         const body = {
-            playerContext: this.getPlayerContextForAI(),
-            newsHeadline: headline,
+            playerContext: context,
+            newsHeadline: headline || '',
             generationType
         };
 
@@ -584,7 +948,36 @@ class PresidentGame {
             resp = await attempt();
         }
 
-        if (!resp || !resp.narrative) throw new Error('Bad AI payload');
+        if (!resp) throw new Error('Bad AI payload');
+
+        if (generationType === 'crisis_options') {
+            if (!resp.narrative || !Array.isArray(resp.narrative.options)) {
+                throw new Error('Bad AI payload');
+            }
+            return resp;
+        }
+
+        if (generationType === 'backstory') {
+            const backstory = Array.isArray(resp.backstory)
+                ? resp.backstory
+                : Array.isArray(resp.narrative?.backstory)
+                    ? resp.narrative.backstory
+                    : [];
+            return { success: resp.success ?? true, backstory };
+        }
+
+        if (generationType === 'callDialogue') {
+            const narrative = typeof resp.narrative === 'string'
+                ? resp.narrative
+                : typeof resp.narrative?.dialogue === 'string'
+                    ? resp.narrative.dialogue
+                    : typeof resp.dialogue === 'string'
+                        ? resp.dialogue
+                        : '';
+            return { success: resp.success ?? true, narrative };
+        }
+
+        if (!resp.narrative) throw new Error('Bad AI payload');
 
         if (generationType === 'crisis_options') {
             return resp;
@@ -628,6 +1021,7 @@ class PresidentGame {
         this.updateDisplay();
         this.displayPowerCenters();
         this.displayRelationships();
+        await this.generateAllBackstories();
         this.setupReporters();
         this.setupTwitterInput();
         
@@ -1200,6 +1594,21 @@ class PresidentGame {
             if (text.includes(keyword)) criticalMatches++;
         });
 
+        if (criticalMatches >= 2) {
+            score = 0.8;
+        } else if (criticalMatches === 1) {
+            score = 0.5;
+        } else {
+            score = 0.2;
+        }
+
+
+        const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
+        let criticalMatches = 0;
+        criticalKeywords.forEach(keyword => {
+            if (text.includes(keyword)) criticalMatches++;
+        });
+
 
         const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
         let criticalMatches = 0;
@@ -1549,6 +1958,20 @@ class PresidentGame {
                 const energy = Number.isFinite(rawEnergy) && rawEnergy !== 0 ? Math.abs(rawEnergy) : 15;
                 const text = aiOpt.text?.trim() || 'AI Response';
 
+
+                for (const rel of rels) {
+                    if (!rel?.center) continue;
+                    const centerId = String(rel.center).toLowerCase().trim();
+                    const change = Number(rel.change);
+                    if (!known.has(centerId) || !Number.isFinite(change) || change === 0) continue;
+                    effects.push({ center: centerId, change });
+                }
+
+                const chaos = Number.isFinite(aiOpt.chaos) ? aiOpt.chaos : 10;
+                const rawEnergy = Number(aiOpt.energy);
+                const energy = Number.isFinite(rawEnergy) && rawEnergy !== 0 ? Math.abs(rawEnergy) : 15;
+                const text = aiOpt.text?.trim() || 'AI Response';
+
                 if (text && text !== 'AI Response') {
                     gameOptions.push({ text, effects, chaos, energy });
                 }
@@ -1576,6 +1999,28 @@ class PresidentGame {
         const hasRussia = headline.includes('russia') || headline.includes('putin');
         const hasMarkets = headline.includes('market') || headline.includes('stock');
         const hasScandal = headline.includes('scandal') || headline.includes('investigation');
+
+        if (hasChina) {
+            options.push({
+                text: `🚢 Deploy carrier group to South China Sea`,
+                effects: [
+                    { center: 'military', change: 18 },
+                    { center: 'wallstreet', change: -15 },
+                    { center: 'intelligence', change: 10 }
+                ],
+                chaos: 25,
+                energy: 25
+            });
+        } else if (hasRussia) {
+            options.push({
+                text: `💣 Authorize lethal aid shipment`,
+                effects: [
+                    { center: 'military', change: 15 },
+                    { center: 'congress', change: -10 },
+                    { center: 'intelligence', change: 12 }
+                ],
+                chaos: 22,
+                energy: 25
 
         if (hasChina) {
             options.push({
@@ -1703,6 +2148,15 @@ class PresidentGame {
                 ],
                 chaos: 5,
                 energy: 20
+            options.push({
+                text: `📞 Request emergency call with Xi Jinping`,
+                effects: [
+                    { center: 'congress', change: 10 },
+                    { center: 'intelligence', change: 12 },
+                    { center: 'military', change: -8 }
+                ],
+                chaos: 5,
+                energy: 20
         if (category === 'foreign') {
             options.push({
                 text: `🤝 Seek diplomatic solution with ${keyTopic}`,
@@ -1793,6 +2247,28 @@ class PresidentGame {
                 energy: 25
             });
         } else if (hasScandal) {
+            options.push({
+                text: `🎤 Schedule prime-time press conference`,
+                effects: [
+                    { center: 'media', change: 12 },
+                    { center: 'public', change: 8 }
+                ],
+                chaos: 10,
+                energy: 20,
+                action: 'pressConference'
+            });
+        } else {
+            options.push({
+                text: `⚡ Issue executive order addressing situation`,
+                effects: centers.map(id => ({
+                    center: id,
+                    change: id === 'congress' ? -8 : 10
+                })),
+                chaos: 18,
+                energy: 20
+            });
+        }
+
             options.push({
                 text: `🎤 Schedule prime-time press conference`,
                 effects: [
@@ -2365,8 +2841,10 @@ class PresidentGame {
         grid.innerHTML = '';
 
         this.relationships.forEach(rel => {
+            if (!Array.isArray(rel.history)) rel.history = [];
             const card = document.createElement('div');
             card.className = 'relationship-card';
+
             const nameDiv = document.createElement('div');
             nameDiv.className = 'relationship-name';
             nameDiv.textContent = rel.name;
@@ -2390,6 +2868,46 @@ class PresidentGame {
             trustLabel.style.fontSize = '10px';
             trustLabel.textContent = `Trust: ${rel.trust}%`;
             card.appendChild(trustLabel);
+
+            card.addEventListener('click', () => this.showCallModal(rel));
+
+            const historyBtn = document.createElement('button');
+            historyBtn.className = 'history-toggle';
+            historyBtn.textContent = 'Show History';
+            historyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const historyDiv = card.querySelector('.relationship-history');
+                if (!historyDiv) return;
+                const isHidden = historyDiv.style.display === 'none';
+                historyDiv.style.display = isHidden ? 'block' : 'none';
+                historyBtn.textContent = isHidden ? 'Hide History' : 'Show History';
+            });
+            card.appendChild(historyBtn);
+
+            const historyDiv = document.createElement('div');
+            historyDiv.className = 'relationship-history';
+            historyDiv.style.display = 'none';
+
+            if (rel.history.length === 0) {
+                const empty = document.createElement('div');
+                empty.textContent = 'No history recorded yet.';
+                historyDiv.appendChild(empty);
+            } else {
+                rel.history.forEach(entry => {
+                    const entryDiv = document.createElement('div');
+                    const date = new Date(entry.timestamp || Date.now()).toLocaleDateString();
+                    const eventText = typeof entry.event === 'string' && entry.event.length
+                        ? entry.event
+                        : 'Event';
+                    const trustChange = Number(entry.trustChange || 0);
+                    const respectChange = Number(entry.respectChange || 0);
+                    const fearChange = Number(entry.fearChange || 0);
+                    entryDiv.textContent = `${date}: ${eventText} (T:${trustChange}, R:${respectChange}, F:${fearChange})`;
+                    historyDiv.appendChild(entryDiv);
+                });
+            }
+
+            card.appendChild(historyDiv);
             card.onclick = () => this.initiatePhoneCall(rel);
             grid.appendChild(card);
         });

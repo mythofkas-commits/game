@@ -601,6 +601,100 @@ body {
 .respect-fill { background: linear-gradient(90deg, #2196F3, #03A9F4); }
 .fear-fill { background: linear-gradient(90deg, #f44336, #ff9800); }
 
+/* CALL MODAL */
+.call-modal, .call-result-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.call-content, .call-result-content {
+    background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(0,0,0,0.8));
+    border: 2px solid #ffd700;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.call-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.call-option {
+    background: rgba(255,255,255,0.1);
+    border: 2px solid #666;
+    color: #fff;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: bold;
+}
+
+.call-option:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: #ffd700;
+}
+
+.close-modal, .close-result {
+    background: #ff0000;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 20px;
+}
+
+.close-modal:hover, .close-result:hover {
+    background: #cc0000;
+}
+
+.relationship-meters {
+    display: flex;
+    justify-content: space-around;
+    margin: 15px 0;
+}
+
+.relationship-meters div {
+    font-size: 14px;
+}
+
+.relationship-history {
+    margin-top: 10px;
+    font-size: 12px;
+    max-height: 100px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.3);
+    padding: 5px;
+    border-radius: 5px;
+}
+
+.history-toggle {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: #ffd700;
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    margin-top: 5px;
+}
+
+
 /* PRESS CONFERENCE */
 .press-conference {
     position: fixed;

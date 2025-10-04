@@ -22,10 +22,17 @@ export default async function handler(req, res) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const { playerContext, newsHeadline, generationType } = req.body;
+    const { playerContext, newsHeadline, generationType } = req.body || {};
 
-    if (!playerContext || !newsHeadline || !generationType) {
-      throw new Error('Missing required parameters');
+    if (!generationType) {
+      throw new Error('Missing generation type');
+    }
+    if (!playerContext) {
+      throw new Error('Missing player context');
+    }
+    const headlineRequired = ['crisis_options', 'scandal', 'diplomaticTwist'].includes(generationType);
+    if (headlineRequired && !newsHeadline) {
+      throw new Error('Missing news headline');
     }
 
     // Craft prompt based on generation type
@@ -70,6 +77,16 @@ Vary chaos: -10 to +30, energy: 10 to 30`;
       prompt = `Generate satirical scandal based on: "${newsHeadline}". Return ONLY JSON: { "headline": "string", "description": "string", "impacts": { "chaos": number, "energy": number, "relationships": [{ "center": "string", "change": number }] } }`;
     } else if (generationType === 'diplomaticTwist') {
       prompt = `Create diplomatic event for: "${newsHeadline}". Return ONLY JSON: { "event": "string", "options": ["string"], "outcomes": [{ "chaos": number, "energy": number, "relationships": [{ "center": "string", "change": number }] }] }`;
+    } else if (generationType === 'backstory') {
+      const rel = playerContext.relationship || {};
+      const name = rel.name || 'this leader';
+      prompt = `Outline 3-5 pivotal moments between the U.S. president and ${name}. Use the relationship context: trust=${rel.trust ?? 'unknown'}, respect=${rel.respect ?? 'unknown'}, fear=${rel.fear ?? 'unknown'}. Return ONLY JSON: { "backstory": [ { "event": "string", "trustChange": number, "respectChange": number, "fearChange": number, "timestamp": "ISO-8601 string" } ] }`;
+    } else if (generationType === 'callDialogue') {
+      const rel = playerContext.relationship || {};
+      const issue = playerContext.issue || newsHeadline || 'the current crisis';
+      const approach = playerContext.approach || 'diplomatic';
+      const outcome = playerContext.outcome?.result || 'pending';
+      prompt = `Write a short quoted response from ${rel.name || 'the counterpart'} during a phone call about "${issue}". The president took a ${approach} approach and the outcome was ${outcome}. Tone should reflect the personality (${rel.personality || 'unknown'}). Return ONLY JSON: { "narrative": "string" }`;
     } else {
       throw new Error('Invalid generation type');
     }
@@ -115,6 +132,8 @@ Vary chaos: -10 to +30, energy: 10 to 30`;
           throw new Error('Invalid option structure');
         }
       }
+      res.status(200).json({ success: true, narrative: generated });
+      return;
     }
 
     if (generationType === 'scandal' && (!generated.headline || !generated.description || !generated.impacts)) {
@@ -122,6 +141,20 @@ Vary chaos: -10 to +30, energy: 10 to 30`;
     }
     if (generationType === 'diplomaticTwist' && (!generated.event || !generated.options || !generated.outcomes)) {
       throw new Error('Incomplete diplomatic twist response');
+    }
+    if (generationType === 'backstory') {
+      if (!Array.isArray(generated.backstory) || generated.backstory.length === 0) {
+        throw new Error('Incomplete backstory response');
+      }
+      res.status(200).json({ success: true, backstory: generated.backstory });
+      return;
+    }
+    if (generationType === 'callDialogue') {
+      if (!generated.narrative || typeof generated.narrative !== 'string') {
+        throw new Error('Incomplete call dialogue response');
+      }
+      res.status(200).json({ success: true, narrative: generated.narrative });
+      return;
     }
 
     res.status(200).json({ success: true, narrative: generated });
@@ -166,8 +199,32 @@ Vary chaos: -10 to +30, energy: 10 to 30`;
             energy: 20
           }
         ]
+      },
+      backstory: [
+        { event: 'Met during a heated committee showdown', trustChange: 6, respectChange: 4, fearChange: -2, timestamp: new Date().toISOString() },
+        { event: 'Brokered a midnight compromise on key legislation', trustChange: 8, respectChange: 7, fearChange: -1, timestamp: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString() },
+        { event: 'Weathered a major scandal together', trustChange: -4, respectChange: 5, fearChange: 3, timestamp: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() }
+      ],
+      callDialogue: 'We hear you, but we expect tangible concessions before moving forward.'
       }
     };
-    res.status(200).json({ success: false, narrative: fallback[generationType] || fallback.scandal });
+
+    if (generationType === 'backstory') {
+      res.status(200).json({ success: false, backstory: fallback.backstory });
+      return;
+    }
+    if (generationType === 'callDialogue') {
+      res.status(200).json({ success: false, narrative: fallback.callDialogue });
+      return;
+    }
+    if (generationType === 'crisis_options') {
+      res.status(200).json({ success: false, narrative: fallback.crisis_options });
+      return;
+    }
+    if (generationType === 'diplomaticTwist') {
+      res.status(200).json({ success: false, narrative: fallback.diplomaticTwist });
+      return;
+    }
+    res.status(200).json({ success: false, narrative: fallback.scandal });
   }
 }
