@@ -578,6 +578,11 @@ class PresidentGame {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        const temp = document.createElement('div');
+        temp.textContent = input;
+        const decoded = temp.innerHTML;
+
+        return decoded.replace(/<[^>]*>/g, '');
     }
 
     /**
@@ -973,6 +978,10 @@ class PresidentGame {
         }
 
         if (!resp.narrative) throw new Error('Bad AI payload');
+
+        if (generationType === 'crisis_options') {
+            return resp;
+        }
 
         const n = resp.narrative;
         const impacts = n?.impacts || n?.impact || {};
@@ -1593,6 +1602,28 @@ class PresidentGame {
             score = 0.2;
         }
 
+
+        const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
+        let criticalMatches = 0;
+        criticalKeywords.forEach(keyword => {
+            if (text.includes(keyword)) criticalMatches++;
+        });
+
+
+        const criticalKeywords = ['breaking', 'urgent', 'crisis', 'emergency', 'threatens', 'war', 'nuclear', 'attack', 'impeach', 'resign'];
+        let criticalMatches = 0;
+        criticalKeywords.forEach(keyword => {
+            if (text.includes(keyword)) criticalMatches++;
+        });
+
+        if (criticalMatches >= 2) {
+            score = 0.8;
+        } else if (criticalMatches === 1) {
+            score = 0.5;
+        } else {
+            score = 0.2;
+        }
+
         const highKeywords = ['president', 'congress', 'senate', 'white house', 'scandal', 'trump', 'biden', 'government', 'federal', 'supreme court'];
         let highMatches = 0;
         highKeywords.forEach(keyword => {
@@ -1927,6 +1958,20 @@ class PresidentGame {
                 const energy = Number.isFinite(rawEnergy) && rawEnergy !== 0 ? Math.abs(rawEnergy) : 15;
                 const text = aiOpt.text?.trim() || 'AI Response';
 
+
+                for (const rel of rels) {
+                    if (!rel?.center) continue;
+                    const centerId = String(rel.center).toLowerCase().trim();
+                    const change = Number(rel.change);
+                    if (!known.has(centerId) || !Number.isFinite(change) || change === 0) continue;
+                    effects.push({ center: centerId, change });
+                }
+
+                const chaos = Number.isFinite(aiOpt.chaos) ? aiOpt.chaos : 10;
+                const rawEnergy = Number(aiOpt.energy);
+                const energy = Number.isFinite(rawEnergy) && rawEnergy !== 0 ? Math.abs(rawEnergy) : 15;
+                const text = aiOpt.text?.trim() || 'AI Response';
+
                 if (text && text !== 'AI Response') {
                     gameOptions.push({ text, effects, chaos, energy });
                 }
@@ -1938,6 +1983,8 @@ class PresidentGame {
             console.warn('AI generation failed:', err);
             return null;
         }
+        const safeSource = this.sanitizeText(story.source);
+        return `${safeSource} reports this breaking development. Your response will impact: ${centerNames}`;
     }
 
     generateHandcraftedOptions(story, affectedCenters) {
@@ -1974,6 +2021,89 @@ class PresidentGame {
                 ],
                 chaos: 22,
                 energy: 25
+
+        if (hasChina) {
+            options.push({
+                text: `🚢 Deploy carrier group to South China Sea`,
+                effects: [
+                    { center: 'military', change: 18 },
+                    { center: 'wallstreet', change: -15 },
+                    { center: 'intelligence', change: 10 }
+                ],
+                chaos: 25,
+                energy: 25
+            });
+        } else if (hasRussia) {
+            options.push({
+                text: `💣 Authorize lethal aid shipment`,
+                effects: [
+                    { center: 'military', change: 15 },
+                    { center: 'congress', change: -10 },
+                    { center: 'intelligence', change: 12 }
+                ],
+                chaos: 22,
+                energy: 25
+        const extractKeyTopic = (text) => {
+            const h = text.toLowerCase();
+            if (h.includes('china') || h.includes('xi')) return 'China';
+            if (h.includes('russia') || h.includes('putin')) return 'Russia';
+            if (h.includes('iran')) return 'Iran';
+            if (h.includes('north korea') || h.includes('kim')) return 'North Korea';
+            if (h.includes('ukraine')) return 'Ukraine';
+            if (h.includes('israel') || h.includes('palestine')) return 'Israel';
+            if (h.includes('taiwan')) return 'Taiwan';
+            if (h.includes('market') || h.includes('stock')) return 'markets';
+            if (h.includes('inflation') || h.includes('economy')) return 'economy';
+            if (h.includes('congress') || h.includes('senate')) return 'Congress';
+            if (h.includes('scandal') || h.includes('investigation')) return 'scandal';
+            return 'this situation';
+        };
+
+        const keyTopic = extractKeyTopic(headline);
+        const shortHeadline = (story.headline || '').substring(0, 40);
+
+        console.log(`🎮 Generating options for: "${story.headline}" (Category: ${category}, Topic: ${keyTopic})`);
+
+        if (category === 'foreign') {
+            const aggressiveText = keyTopic === 'China'
+                ? `💪 Confront China directly on "${shortHeadline}..."`
+                : keyTopic === 'Russia'
+                    ? `⚔️ Impose harsh sanctions over "${shortHeadline}..."`
+                    : keyTopic === 'Iran'
+                        ? `🎯 Issue military ultimatum regarding "${shortHeadline}..."`
+                        : `💪 Take aggressive stance on "${shortHeadline}..."`;
+
+            options.push({
+                text: aggressiveText,
+                effects: affectedCenters.map(id => {
+                    if (id === 'military') return { center: id, change: 15 };
+                    if (id === 'wallstreet') return { center: id, change: -12 };
+                    if (id === 'intelligence') return { center: id, change: 10 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 3 };
+                }),
+                chaos: 20,
+                energy: 25
+            });
+        } else if (category === 'economy') {
+            const economicText = headline.includes('inflation')
+                ? `🏦 Emergency action on inflation: "${shortHeadline}..."`
+                : headline.includes('market')
+                    ? `💵 Stabilize markets after "${shortHeadline}..."`
+                    : headline.includes('unemploy')
+                        ? `💼 Launch jobs program responding to "${shortHeadline}..."`
+                        : `📊 Strong economic intervention: "${shortHeadline}..."`;
+
+            options.push({
+                text: economicText,
+                effects: affectedCenters.map(id => {
+                    if (id === 'wallstreet') return { center: id, change: 12 };
+                    if (id === 'industry') return { center: id, change: 10 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 12,
+                energy: 20
             });
         } else if (hasScandal) {
             options.push({
@@ -1982,6 +2112,13 @@ class PresidentGame {
                     { center: 'media', change: -18 },
                     { center: 'public', change: 12 }
                 ],
+                text: `⚔️ Attack accusers over "${shortHeadline}..."`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: -20 };
+                    if (id === 'public') return { center: id, change: 10 };
+                    if (id === 'congress') return { center: id, change: -10 };
+                    return { center: id, change: -5 };
+                }),
                 chaos: 25,
                 energy: 15
             });
@@ -1989,6 +2126,13 @@ class PresidentGame {
             options.push({
                 text: `📞 Convene National Security Council`,
                 effects: centers.map(id => ({ center: id, change: 10 })),
+                text: `💪 Take decisive action on "${shortHeadline}..."`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'military' || id === 'intelligence') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: -5 };
+                    if (id === 'public') return { center: id, change: 12 };
+                    return { center: id, change: 5 };
+                }),
                 chaos: 15,
                 energy: 20
             });
@@ -2004,6 +2148,26 @@ class PresidentGame {
                 ],
                 chaos: 5,
                 energy: 20
+            options.push({
+                text: `📞 Request emergency call with Xi Jinping`,
+                effects: [
+                    { center: 'congress', change: 10 },
+                    { center: 'intelligence', change: 12 },
+                    { center: 'military', change: -8 }
+                ],
+                chaos: 5,
+                energy: 20
+        if (category === 'foreign') {
+            options.push({
+                text: `🤝 Seek diplomatic solution with ${keyTopic}`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 12 };
+                    if (id === 'military') return { center: id, change: -8 };
+                    if (id === 'media') return { center: id, change: 10 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: -5,
+                energy: 15
             });
         } else if (hasMarkets) {
             options.push({
@@ -2014,6 +2178,26 @@ class PresidentGame {
                 ],
                 chaos: -5,
                 energy: 15
+                text: `📋 Form bipartisan commission on ${keyTopic}`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 15 };
+                    if (id === 'media') return { center: id, change: 8 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: -8,
+                energy: 12
+            });
+        } else if (category === 'scandal') {
+            options.push({
+                text: `🛡️ Lawyer up and stonewall on "${shortHeadline}..."`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: -10 };
+                    if (id === 'public') return { center: id, change: -5 };
+                    if (id === 'congress') return { center: id, change: 5 };
+                    return { center: id, change: 2 };
+                }),
+                chaos: 8,
+                energy: 12
             });
         } else {
             options.push({
@@ -2022,6 +2206,13 @@ class PresidentGame {
                     { center: 'congress', change: 12 },
                     { center: 'media', change: 8 }
                 ],
+                text: `🤝 Take measured approach to ${keyTopic}`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'congress') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: 8 };
+                    if (id === 'military') return { center: id, change: -5 };
+                    return { center: id, change: 5 };
+                }),
                 chaos: -5,
                 energy: 15
             });
@@ -2033,6 +2224,12 @@ class PresidentGame {
                 { center: 'public', change: 12 },
                 { center: 'media', change: -10 }
             ],
+            text: `🐦 Tweet storm about ${keyTopic}`,
+            effects: affectedCenters.map(id => {
+                if (id === 'public') return { center: id, change: 12 };
+                if (id === 'media') return { center: id, change: -8 };
+                return { center: id, change: this.rand() > 0.5 ? 5 : -5 };
+            }),
             chaos: 15,
             energy: 5,
             action: 'focusTwitter'
@@ -2072,6 +2269,67 @@ class PresidentGame {
             });
         }
 
+            options.push({
+                text: `🎤 Schedule prime-time press conference`,
+                effects: [
+                    { center: 'media', change: 12 },
+                    { center: 'public', change: 8 }
+                ],
+                chaos: 10,
+                energy: 20,
+                action: 'pressConference'
+            });
+        } else {
+            options.push({
+                text: `⚡ Issue executive order addressing situation`,
+                effects: centers.map(id => ({
+                    center: id,
+                    change: id === 'congress' ? -8 : 10
+                })),
+                chaos: 18,
+                energy: 20
+            });
+        }
+
+        if (category === 'scandal') {
+            options.push({
+                text: `🎤 Emergency press conference on "${shortHeadline}..."`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'media') return { center: id, change: 10 };
+                    if (id === 'public') return { center: id, change: 8 };
+                    return { center: id, change: 3 };
+                }),
+                chaos: 5,
+                energy: 15,
+                action: 'pressConference'
+            });
+        } else if (category === 'foreign' && (keyTopic === 'China' || keyTopic === 'Russia')) {
+            options.push({
+                text: `📞 Call emergency meeting with ${keyTopic} leader`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'intelligence') return { center: id, change: 15 };
+                    if (id === 'congress') return { center: id, change: 10 };
+                    if (id === 'military') return { center: id, change: 5 };
+                    return { center: id, change: 5 };
+                }),
+                chaos: 10,
+                energy: 20
+            });
+        } else {
+            options.push({
+                text: `🔥 Go on offensive about ${keyTopic}`,
+                effects: affectedCenters.map(id => {
+                    if (id === 'public') return { center: id, change: 10 };
+                    if (id === 'media') return { center: id, change: -12 };
+                    if (id === 'congress') return { center: id, change: -8 };
+                    return { center: id, change: -5 };
+                }),
+                chaos: 22,
+                energy: 15
+            });
+        }
+
+        console.log(`✅ Generated ${options.length} SPECIFIC options for ${keyTopic}`);
         return options;
     }
 
@@ -2650,6 +2908,7 @@ class PresidentGame {
             }
 
             card.appendChild(historyDiv);
+            card.onclick = () => this.initiatePhoneCall(rel);
             grid.appendChild(card);
         });
     }

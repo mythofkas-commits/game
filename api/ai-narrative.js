@@ -206,6 +206,7 @@ Vary chaos: -10 to +30, energy: 10 to 30`;
         { event: 'Weathered a major scandal together', trustChange: -4, respectChange: 5, fearChange: 3, timestamp: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() }
       ],
       callDialogue: 'We hear you, but we expect tangible concessions before moving forward.'
+      }
     };
 
     if (generationType === 'backstory') {
