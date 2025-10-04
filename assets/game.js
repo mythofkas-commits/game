@@ -1144,6 +1144,11 @@ class PresidentGame {
     setupTwitterInput() {
         const input = document.getElementById('tweetInput');
         
+        if (!input) {
+            console.warn('Tweet input element not found');
+            return;
+        }
+        
         // Add Enter key handler: Enter = send, Shift+Enter = new line
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1157,6 +1162,10 @@ class PresidentGame {
     
     displayPowerCenters() {
         const container = document.getElementById('powerCentersGrid');
+        if (!container) {
+            console.warn('Power centers grid container not found');
+            return;
+        }
         container.innerHTML = '';
 
         this.powerCenters.forEach(center => {
@@ -1262,6 +1271,10 @@ class PresidentGame {
 
     sendTweet() {
         const input = document.getElementById('tweetInput');
+        if (!input) {
+            console.warn('Tweet input element not found');
+            return;
+        }
         const content = input.value.trim();
 
         if (!content) {
@@ -1363,6 +1376,7 @@ class PresidentGame {
         Object.assign(analysis.powerEffects, toneAnalysis.powerEffects);
 
         // PROFANITY CHECK
+        const profanity = ['damn', 'hell', 'crap', 'shit', 'fuck', 'ass'];
         profanity.forEach(word => {
             if (lower.includes(word)) {
                 analysis.chaos += 20;
@@ -1733,7 +1747,7 @@ class PresidentGame {
         const templates = this.getOppositionTemplates(opponent, type);
         const template = templates[Math.floor(this.rand() * templates.length)];
         
-        let tweet = template.text;
+        let tweet = template;
         
         // Replace placeholders
         if (type === 'news') {
@@ -1928,7 +1942,10 @@ class PresidentGame {
             </div>
         `;
         
-        document.getElementById('crisisPanel').appendChild(battleEl);
+        const crisisPanel = document.getElementById('crisisPanel');
+        if (crisisPanel) {
+            crisisPanel.appendChild(battleEl);
+        }
         
         // Auto-remove after duration
         setTimeout(() => {
@@ -2268,14 +2285,20 @@ class PresidentGame {
             feedback.appendChild(impactLine);
         }
 
-        document.getElementById('tweetFeedback').appendChild(feedback);
-
-        setTimeout(() => feedback.remove(), 8000); // Longer display time for enhanced analysis
+        const feedbackContainer = document.getElementById('tweetFeedback');
+        if (feedbackContainer) {
+            feedbackContainer.appendChild(feedback);
+            setTimeout(() => feedback.remove(), 8000); // Longer display time for enhanced analysis
+        }
     }
 
     focusTwitter() {
         this.respondingToCrisis = true; // Mark that we're responding via tweet
         const input = document.getElementById('tweetInput');
+        if (!input) {
+            console.warn('Tweet input element not found');
+            return;
+        }
         input.focus();
         input.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -3436,16 +3459,26 @@ class PresidentGame {
     }
 
     startPressConference() {
-        document.getElementById('pressConference').classList.add('active');
+        const pressConference = document.getElementById('pressConference');
+        if (pressConference) {
+            pressConference.classList.add('active');
+        }
         this.setupReporters();
     }
 
     endPressConference() {
-        document.getElementById('pressConference').classList.remove('active');
+        const pressConference = document.getElementById('pressConference');
+        if (pressConference) {
+            pressConference.classList.remove('active');
+        }
     }
 
     setupReporters() {
         const row = document.getElementById('reportersRow');
+        if (!row) {
+            console.warn('Reporters row container not found');
+            return;
+        }
         row.innerHTML = '';
 
         this.reporters.forEach(reporter => {
@@ -3513,6 +3546,10 @@ class PresidentGame {
 
     displayRelationships() {
         const grid = document.getElementById('relationshipsGrid');
+        if (!grid) {
+            console.warn('Relationships grid container not found');
+            return;
+        }
         grid.innerHTML = '';
 
         this.relationships.forEach(rel => {
@@ -3589,10 +3626,15 @@ class PresidentGame {
     }
 
     updateDisplay() {
-        document.getElementById('day').textContent = this.day;
-        document.getElementById('energy').textContent = this.energy;
-        document.getElementById('chaos').textContent = this.chaos;
-        document.getElementById('score').textContent = this.score;
+        const dayEl = document.getElementById('day');
+        const energyEl = document.getElementById('energy');
+        const chaosEl = document.getElementById('chaos');
+        const scoreEl = document.getElementById('score');
+        
+        if (dayEl) dayEl.textContent = this.day;
+        if (energyEl) energyEl.textContent = this.energy;
+        if (chaosEl) chaosEl.textContent = this.chaos;
+        if (scoreEl) scoreEl.textContent = this.score;
     }
 
     showNotification(message) {
