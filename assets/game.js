@@ -1124,13 +1124,72 @@ class PresidentGame {
         loading.className = 'loading-screen';
         loading.innerHTML = `
             <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <h2 style="color: #ffd700; margin: 20px 0;">Loading Your Presidency</h2>
-                <p style="color: #ddd;">Fetching real-time political news from around the world...</p>
-                <p style="color: #aaa; font-size: 14px; margin-top: 10px;">Initializing power centers and crisis systems</p>
+                <div class="loading-animation">
+                    <div class="president-icon">🏛️</div>
+                    <div class="loading-spinner"></div>
+                </div>
+                <h2 style="color: #ffd700; margin: 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Loading Your Presidency</h2>
+                <div class="loading-steps">
+                    <div class="loading-step active" id="step-1">
+                        <span class="step-icon">🌐</span>
+                        <span class="step-text">Fetching real-time political news...</span>
+                    </div>
+                    <div class="loading-step" id="step-2">
+                        <span class="step-icon">⚡</span>
+                        <span class="step-text">Initializing power centers...</span>
+                    </div>
+                    <div class="loading-step" id="step-3">
+                        <span class="step-icon">🎯</span>
+                        <span class="step-text">Setting up crisis systems...</span>
+                    </div>
+                    <div class="loading-step" id="step-4">
+                        <span class="step-icon">🐦</span>
+                        <span class="step-text">Connecting to Twitter...</span>
+                    </div>
+                </div>
+                <div class="loading-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
             </div>
         `;
         document.body.appendChild(loading);
+        
+        // Start the loading animation
+        this.animateLoadingSteps();
+    }
+
+    animateLoadingSteps() {
+        const steps = [
+            { id: 'step-1', text: 'Fetching real-time political news...', progress: 25 },
+            { id: 'step-2', text: 'Initializing power centers...', progress: 50 },
+            { id: 'step-3', text: 'Setting up crisis systems...', progress: 75 },
+            { id: 'step-4', text: 'Connecting to Twitter...', progress: 100 }
+        ];
+
+        let currentStep = 0;
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        const updateStep = () => {
+            if (currentStep < steps.length) {
+                const step = steps[currentStep];
+                const stepEl = document.getElementById(step.id);
+                
+                if (stepEl) {
+                    stepEl.classList.add('active');
+                    if (progressFill) progressFill.style.width = `${step.progress}%`;
+                    if (progressText) progressText.textContent = `${step.progress}%`;
+                }
+                
+                currentStep++;
+                setTimeout(updateStep, 800);
+            }
+        };
+
+        updateStep();
     }
 
     hideLoadingScreen() {
@@ -2522,23 +2581,57 @@ class PresidentGame {
 
     displayNewsTicker() {
         const ticker = document.getElementById('newsTickerContent');
+        if (!ticker) {
+            console.warn('News ticker container not found');
+            return;
+        }
+        
         ticker.innerHTML = '';
 
         // Deduplicate before displaying
         const uniqueStories = this.deduplicateNews(this.currentNewsStories);
 
-        uniqueStories.forEach(story => {
-            const item = document.createElement('span');
+        uniqueStories.forEach((story, index) => {
+            const item = document.createElement('div');
             item.className = 'news-item';
+            
+            // Add relevance-based styling
+            if (story.relevance > 0.8) {
+                item.classList.add('breaking-news');
+            } else if (story.relevance > 0.6) {
+                item.classList.add('important-news');
+            }
 
-            // Add emoji badge based on relevance
-            const badge = story.relevance > 0.75 ? '🔥' :
-                         story.relevance > 0.5 ? '⚡' : '📰';
+            // Add emoji badge based on relevance and category
+            let badge = '📰';
+            if (story.relevance > 0.8) badge = '🔥';
+            else if (story.relevance > 0.6) badge = '⚡';
+            else if (story.relevance > 0.4) badge = '📊';
+            
+            // Add category-specific badges
+            if (story.category === 'foreign') badge = '🌍';
+            else if (story.category === 'economy') badge = '💰';
+            else if (story.category === 'military') badge = '🛡️';
+            else if (story.category === 'domestic') badge = '🏛️';
 
             const safeSource = this.sanitizeText(story.source);
             const safeHeadline = this.sanitizeText(story.headline);
-            item.textContent = `${badge} [${safeSource}] ${safeHeadline}`;
+            
+            item.innerHTML = `
+                <div class="news-badge">${badge}</div>
+                <div class="news-content">
+                    <div class="news-source">${safeSource}</div>
+                    <div class="news-headline">${safeHeadline}</div>
+                    <div class="news-relevance">Relevance: ${Math.round(story.relevance * 100)}%</div>
+                </div>
+            `;
+            
             item.onclick = () => this.respondToNews(story);
+            
+            // Add staggered animation
+            item.style.animationDelay = `${index * 0.1}s`;
+            item.classList.add('news-item-enter');
+            
             ticker.appendChild(item);
         });
 
@@ -3305,81 +3398,12 @@ class PresidentGame {
             this.displayNewsTicker();
             console.log('📦 Using cached news');
         } else {
-            // Ultimate fallback
-            this.loadMockNews();
+            // No cached news available - show error
+            this.showLoadingError();
         }
     }
 
-    loadMockNews() {
-        this.currentNewsStories = [
-            {
-                headline: 'Congress Debates $2 Trillion Infrastructure Package',
-                source: 'Reuters',
-                relevance: 0.9,
-                category: 'domestic',
-                affectedCenters: ['congress', 'public', 'industry'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'China Conducts Military Exercises Near Taiwan',
-                source: 'CNN',
-                relevance: 0.85,
-                category: 'foreign',
-                affectedCenters: ['military', 'intelligence', 'wallstreet'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Federal Reserve Signals Interest Rate Changes',
-                source: 'Bloomberg',
-                relevance: 0.8,
-                category: 'economy',
-                affectedCenters: ['wallstreet', 'public', 'industry'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Supreme Court to Review Major Healthcare Case',
-                source: 'NPR',
-                relevance: 0.75,
-                category: 'domestic',
-                affectedCenters: ['congress', 'public', 'science'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Pentagon Unveils New Defense Strategy',
-                source: 'Defense News',
-                relevance: 0.7,
-                category: 'military',
-                affectedCenters: ['military', 'intelligence', 'congress'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Tech Giants Face New Regulation Proposals',
-                source: 'Wall Street Journal',
-                relevance: 0.65,
-                category: 'economy',
-                affectedCenters: ['industry', 'congress', 'wallstreet'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Climate Scientists Issue Urgent Warning',
-                source: 'Nature',
-                relevance: 0.6,
-                category: 'domestic',
-                affectedCenters: ['science', 'public', 'industry'],
-                timestamp: Date.now()
-            },
-            {
-                headline: 'Russia Responds to Latest Sanctions Package',
-                source: 'BBC',
-                relevance: 0.75,
-                category: 'foreign',
-                affectedCenters: ['intelligence', 'military', 'congress'],
-                timestamp: Date.now()
-            }
-        ];
-        this.displayNewsTicker();
-        console.log('📰 Showing initial mock news (8 stories)');
-    }
+    // Mock news system removed - using only real news now
 
     // ============= EXISTING SYSTEMS =============
 
