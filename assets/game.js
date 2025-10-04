@@ -190,6 +190,11 @@ class PresidentGame {
             powerChanges: [],
             crises: []
         };
+
+        this.notifications = [];
+        this.maxVisibleNotifications = 5;
+        this.notificationId = 0;
+        this.setupNotificationsContainer();
     }
 
     // ============= BACKSTORY GENERATION =============
@@ -3661,16 +3666,97 @@ class PresidentGame {
         if (scoreEl) scoreEl.textContent = this.score;
     }
 
-    showNotification(message) {
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
+    setupNotificationsContainer() {
+        let container = document.getElementById('notificationsContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notificationsContainer';
+            container.className = 'notifications-container';
+            document.body.appendChild(container);
+        }
+    }
 
-        const notif = document.createElement('div');
-        notif.className = 'notification';
-        notif.textContent = this.sanitizeText(message);
-        document.body.appendChild(notif);
+    showNotification(message, type = 'info', duration = 4000, dismissible = true) {
+        const id = this.notificationId++;
 
-        setTimeout(() => notif.remove(), 3000);
+        const notification = {
+            id,
+            message: this.sanitizeText(message),
+            type,
+            timestamp: Date.now(),
+            duration
+        };
+
+        this.notifications.push(notification);
+
+        const notifEl = document.createElement('div');
+        notifEl.className = `notification ${type}`;
+        notifEl.id = `notification-${id}`;
+        notifEl.dataset.notificationId = id;
+
+        const icons = {
+            info: 'ℹ️',
+            success: '✅',
+            warning: '⚠️',
+            error: '❌'
+        };
+
+        const icon = document.createElement('div');
+        icon.className = 'notification-icon';
+        icon.textContent = icons[type] || 'ℹ️';
+
+        const content = document.createElement('div');
+        content.className = 'notification-content';
+        content.textContent = notification.message;
+
+        notifEl.appendChild(icon);
+        notifEl.appendChild(content);
+
+        if (dismissible) {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'notification-close';
+            closeBtn.type = 'button';
+            closeBtn.setAttribute('aria-label', 'Close notification');
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => this.dismissNotification(id);
+            notifEl.appendChild(closeBtn);
+        }
+
+        const container = document.getElementById('notificationsContainer');
+        container.appendChild(notifEl);
+
+        if (duration > 0) {
+            setTimeout(() => this.dismissNotification(id), duration);
+        }
+
+        this.enforceNotificationLimit();
+        return id;
+    }
+
+    dismissNotification(id) {
+        const notifEl = document.getElementById(`notification-${id}`);
+        if (notifEl) {
+            notifEl.style.animation = 'slideOutRight 0.4s ease-in forwards';
+            setTimeout(() => notifEl.remove(), 400);
+        }
+        this.notifications = this.notifications.filter(n => n.id !== id);
+    }
+
+    enforceNotificationLimit() {
+        const container = document.getElementById('notificationsContainer');
+        const notifs = Array.from(container.children);
+
+        if (notifs.length > this.maxVisibleNotifications) {
+            const toRemove = notifs.length - this.maxVisibleNotifications;
+            for (let i = 0; i < toRemove; i++) {
+                const oldestId = parseInt(notifs[i].dataset.notificationId);
+                this.dismissNotification(oldestId);
+            }
+        }
+    }
+
+    clearAllNotifications() {
+        this.notifications.forEach(n => this.dismissNotification(n.id));
     }
 }
 

@@ -1,7 +1,5 @@
-// Vercel serverless function for news API
-// This protects the API key and handles CORS
+// api/news.js
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,13 +16,10 @@ export default async function handler(req, res) {
 
   try {
     const { q, language = 'en', sortBy = 'publishedAt', pageSize = 10 } = req.query;
-
-    // NewsAPI key should be stored in Vercel environment variables
     const API_KEY = process.env.NEWS_API_KEY;
     
     if (!API_KEY) {
       console.error('NEWS_API_KEY environment variable not set');
-      // Return mock data if API key not available
       return res.status(200).json({
         articles: [
           {
@@ -37,12 +32,6 @@ export default async function handler(req, res) {
             title: 'China Warns Against Taiwan Independence',
             source: { name: 'CNN' },
             description: 'International tensions rising',
-            publishedAt: new Date().toISOString()
-          },
-          {
-            title: 'Fed Considers Interest Rate Hike Amid Inflation Concerns',
-            source: { name: 'Bloomberg' },
-            description: 'Economic policy under review',
             publishedAt: new Date().toISOString()
           }
         ]
@@ -68,7 +57,6 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     
-    // Filter out articles with [Removed] content (common in NewsAPI)
     if (data.articles) {
       data.articles = data.articles.filter(article => 
         article.title !== '[Removed]' && 

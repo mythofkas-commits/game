@@ -33,10 +33,17 @@
             <p><strong>Chaos</strong> tracks how unstable the nation feels. High chaos invites wilder crises and rewards but makes control harder.</p>
         </div>
 
-        <!-- REAL-TIME NEWS TICKER -->
+        <!-- IMPROVED NEWS TICKER - Vertical List -->
         <div class="news-ticker" id="newsTicker">
+            <h3>📡 Breaking Political News</h3>
             <div class="news-ticker-content" id="newsTickerContent">
-                <span class="news-item">📡 Loading real political news...</span>
+                <div class="news-item">
+                    <span class="news-badge">⏳</span>
+                    <div class="news-content">
+                        <div class="news-source">Loading</div>
+                        <div class="news-headline">Fetching real-time political news...</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -106,6 +113,9 @@
             <button class="response-btn" onclick="game.pressResponse('joke')">😂 JOKE</button>
         </div>
     </div>
+
+    <!-- NOTIFICATIONS CONTAINER (NEW) -->
+    <div class="notifications-container" id="notificationsContainer" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <!-- POWER NOTIFICATIONS CONTAINER -->
     <div class="power-notifications-container" id="powerNotifications"></div>
