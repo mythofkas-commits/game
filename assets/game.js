@@ -3899,10 +3899,14 @@ class PresidentGame {
         document.body.appendChild(modal);
 
         // Auto-dismiss after 15 seconds
+        const modalId = `breaking-${Date.now()}`;
+        modal.id = modalId;
+
         setTimeout(() => {
-            if (modal.parentNode) {
+            const currentModal = document.getElementById(modalId);
+            if (currentModal && currentModal.parentNode) {
                 this.state.applyEffects({ chaosDelta: 10 }, { source: 'breaking-news-timeout' });
-                modal.remove();
+                currentModal.remove();
                 this.showNotification('⚠️ Ignored breaking news - chaos increased!');
             }
         }, 15000);
@@ -4281,6 +4285,7 @@ class PresidentGame {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'notification-close';
             closeBtn.type = 'button';
+            closeBtn.textContent = '×';
             closeBtn.ariaLabel = 'Close notification';
             closeBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -4300,7 +4305,7 @@ class PresidentGame {
     }
 
     dismissNotification(id) {
-        const notifEl = document.getElementById(`notification-${id}`);
+        const notifEl = document.querySelector(`[data-notification-id="${id}"]`);
         if (notifEl) {
             notifEl.style.animation = 'slideOutRight 0.4s ease-in forwards';
             setTimeout(() => notifEl.remove(), 400);

@@ -360,6 +360,12 @@ body {
     transition: all 0.3s;
 }
 
+.notification-close::before {
+    /* content: '×'; Removed to avoid duplicate "×" symbol */
+    font-size: 20px;
+    line-height: 1;
+}
+
 .notification-close:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
