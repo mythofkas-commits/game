@@ -1,6 +1,7 @@
 {
   "functions": {
     "api/news.js": { "maxDuration": 30 },
+    "api/guardian.js": { "maxDuration": 30 },
     "api/rss.js": { "maxDuration": 30 },
     "api/ai-narrative.js": { "maxDuration": 30 },
     "api/cron/fetch-news.js": { "maxDuration": 60 }

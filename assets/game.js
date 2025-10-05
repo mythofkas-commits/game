@@ -20,6 +20,562 @@ function startPresidency() {
     game.init();
 }
 
+/*
+==============================================================================
+ENHANCED GAME CODE — Notification Inbox & Public Opinion Battle Mini-Game
+Add these methods and updates to your PresidentGame Class in assets/game.js
+==============================================================================
+*/
+
+// ============= NOTIFICATION INBOX SYSTEM =============
+
+class NotificationInbox {
+  constructor(game) {
+    this.game = game;
+    this.notifications = [];
+    this.unreadCount = 0;
+    this.isOpen = false;
+    this.currentFilter = 'all';
+    this.maxStored = 100;
+
+    this.loadStoredNotifications();
+    this.setupInboxUI();
+  }
+
+  loadStoredNotifications() {
+    try {
+      const stored = localStorage.getItem('notificationInbox');
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.notifications = data.notifications || [];
+        this.unreadCount = data.unreadCount || 0;
+      }
+    } catch (e) {
+      console.warn('failed to load notification inbox:', e);
+    }
+  }
+
+  saveNotifications() {
+    try {
+      localStorage.setItem('notificationInbox', JSON.stringify({
+        notifications: this.notifications.slice(0, this.maxStored),
+        unreadCount: this.unreadCount,
+      }));
+    } catch (e) {
+      console.warn('failed to save notifications:', e);
+    }
+  }
+
+  setupInboxUI() {
+    // Create inbox icon
+    const icon = document.createElement('div');
+    icon.className = 'notification-inbox-icon';
+    icon.innerHTML = `
+      <div class="inbox-icon">📫</div>
+      <div class="inbox-badge" style="display: ${this.unreadCount > 0 ? 'flex' : 'none'}">
+        ${this.unreadCount}
+      </div>
+    `;
+    icon.onclick = () => this.toggleInbox();
+    document.body.appendChild(icon);
+    this.iconElement = icon;
+
+    // Create inbox panel
+    const panel = document.createElement('div');
+    panel.className = 'notification-inbox-panel';
+    panel.innerHTML = `
+      <div class="inbox-header">
+        <h3>Notification Inbox</h3>
+        <button class="inbox-close-btn">×</button>
+      </div>
+      <div class="inbox-filters">
+        <button class="inbox-filter-btn active" data-filter="all">All</button>
+        <button class="inbox-filter-btn" data-filter="info">Info</button>
+        <button class="inbox-filter-btn" data-filter="success">Success</button>
+        <button class="inbox-filter-btn" data-filter="warning">Warning</button>
+        <button class="inbox-filter-btn" data-filter="error">Errors</button>
+      </div>
+      <div id="inboxContent"></div>
+    `;
+    document.body.appendChild(panel);
+    this.panelElement = panel;
+
+    panel.querySelector('.inbox-close-btn').onclick = () => this.closeInbox();
+    panel.querySelectorAll('.inbox-filter-btn').forEach(btn => {
+      btn.onclick = () => this.setFilter(btn.dataset.filter);
+    });
+
+    this.renderInbox();
+  }
+
+  addNotification(message, type = 'info', metadata = {}) {
+    const notification = {
+      id: Date.now() + Math.random(),
+      message: this.game.sanitizeText(message),
+      type,
+      timestamp: Date.now(),
+      read: false,
+      metadata,
+    };
+
+    this.notifications.unshift(notification);
+    this.unreadCount++;
+
+    // Update badge
+    const badge = this.iconElement.querySelector('.inbox-badge');
+    badge.style.display = 'flex';
+    badge.textContent = this.unreadCount;
+
+    // Keep only the latest notifications
+    if (this.notifications.length > this.maxStored) {
+      this.notifications = this.notifications.slice(0, this.maxStored);
+    }
+
+    this.saveNotifications();
+    if (this.isOpen) this.renderInbox();
+
+    return notification.id;
+  }
+
+  toggleInbox() {
+    if (this.isOpen) this.closeInbox();
+    else this.openInbox();
+  }
+
+  openInbox() {
+    this.isOpen = true;
+    this.panelElement.classList.add('open');
+    this.renderInbox();
+  }
+
+  closeInbox() {
+    this.isOpen = false;
+    this.panelElement.classList.remove('open');
+  }
+
+  setFilter(filter) {
+    this.currentFilter = filter;
+
+    // Update active button
+    this.panelElement.querySelectorAll('.inbox-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+
+    this.renderInbox();
+  }
+
+  renderInbox() {
+    const content = this.panelElement.querySelector('#inboxContent');
+
+    const filtered = this.currentFilter === 'all'
+      ? this.notifications
+      : this.notifications.filter(n => n.type === this.currentFilter);
+
+    if (filtered.length === 0) {
+      content.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #aaa;">
+          <div style="font-size: 48px; margin-bottom: 15px;">📭</div>
+          <div>${this.currentFilter === 'all' ? 'No notifications' : `No ${this.currentFilter} notifications`}</div>
+        </div>
+      `;
+      return;
+    }
+
+    content.innerHTML = filtered.map(n => {
+      const timeAgo = this.formatTimeAgo(n.timestamp);
+      return `
+        <div class="inbox-notification ${n.type} ${n.read ? '' : 'unread'}" data-id="${n.id}">
+          <div class="inbox-notification-header">
+            <span style="font-weight: 600; text-transform: capitalize;">${n.type}</span>
+            <span class="inbox-notification-time">${timeAgo}</span>
+          </div>
+          <div class="inbox-notification-preview">${n.message}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers
+    content.querySelectorAll('.inbox-notification').forEach(el => {
+      el.onclick = () => {
+        const id = parseFloat(el.dataset.id);
+        this.openNotificationDetail(id);
+      };
+    });
+  }
+
+  openNotificationDetail(id) {
+    const notification = this.notifications.find(n => n.id === id);
+    if (!notification) return;
+
+    // Mark as read
+    if (!notification.read) {
+      notification.read = true;
+      this.unreadCount = Math.max(0, this.unreadCount - 1);
+
+      const badge = this.iconElement.querySelector('.inbox-badge');
+      badge.textContent = this.unreadCount;
+      badge.style.display = this.unreadCount > 0 ? 'flex' : 'none';
+    }
+
+    this.saveNotifications();
+    this.renderInbox();
+
+    // Create modal
+    const existing = document.querySelector('.notification-detail-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'notification-detail-modal';
+
+    const icons = {
+      info: 'ℹ️',
+      success: '✅',
+      warning: '⚠️',
+      error: '❌',
+    };
+
+    const timestamp = new Date(notification.timestamp).toLocaleString();
+
+    modal.innerHTML = `
+      <div class="notification-detail-header">
+        <div class="notification-detail-icon">${icons[notification.type] || ''}</div>
+        <div class="notification-detail-title">
+          <h3 style="text-transform: capitalize;">${notification.type} Notifications</h3>
+          <div class="time">${timestamp}</div>
+        </div>
+      </div>
+      <div class="notification-detail-content">
+        ${notification.message}
+        ${notification.metadata && Object.keys(notification.metadata).length ? `
+          <div style="margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+            <div style="margin-bottom: 6px;">Additional Details:</div>
+            ${Object.entries(notification.metadata).map(([key, value]) =>
+              `<div style="margin-top: 8px;"><span style="color: var(--primary-gold);">${key}</span>: <span>${value}</span></div>`
+            ).join('')}
+          </div>` : ''
+        }
+      </div>
+      <div class="notification-detail-actions">
+        <button class="close-modal" style="flex: 1;">Close</button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.querySelector('.close-modal').onclick = () => modal.remove();
+  }
+
+  formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  clearAll() {
+    if (confirm('Clear all notifications?')) {
+      this.notifications = [];
+      this.unreadCount = 0;
+      this.saveNotifications();
+      this.renderInbox();
+
+      const badge = this.iconElement.querySelector('.inbox-badge');
+      badge.style.display = 'none';
+    }
+  }
+}
+
+// ============== ENHANCED PUBLIC OPINION BATTLE MINI-GAME ==============
+
+class PublicOpinionBattleGame {
+  constructor(game, opponent, topic, initialData) {
+    this.game = game;
+    this.opponent = opponent;
+    this.topic = topic;
+    this.playerScore = initialData.playerScore || 50;
+    this.opponentScore = initialData.opponentScore || 50;
+    this.startTime = Date.now();
+    this.duration = 120000; // 2 minutes
+    this.maxRounds = 5;
+    this.currentRound = 0;
+    this.rounds = [];
+    this.powerups = {
+      mediaSpin: { used: false, effect: 15, cost: 10 },
+      populistAppeal: { used: false, effect: 20, cost: 15 },
+      factCheck: { used: false, effect: 10, cost: 5 },
+    };
+    this.resultShown = null;
+
+    this.generateRounds();
+    this.render();
+    this.startTimer();
+  }
+
+  generateRounds() {
+    const topics = [
+      {
+        question: `${this.opponent.name} claims your handling of ${this.topic} is inadequate. How do you respond?`,
+        options: [
+          { text: 'Present data and evidence', effect: 12, chaos: 3 },
+          { text: 'Rally public support', effect: 15, chaos: 5 },
+          { text: 'Attack their credibility', effect: 18, chaos: 10 },
+          { text: 'Propose compromise', effect: 8, chaos: 5 },
+        ],
+      },
+      {
+        question: `The media is amplifying ${this.opponent.name}'s criticism. Your move?`,
+        options: [
+          { text: 'Schedule prime-time interview', effect: 14, chaos: 2 },
+          { text: 'Launch tweet offensive', effect: 16, chaos: 8 },
+          { text: 'Leak favorable story', effect: 12, chaos: 6 },
+          { text: 'Stay silent, let it pass', effect: 5, chaos: 2 },
+        ],
+      },
+      {
+        question: `${this.opponent.name} just gained ground with swing voters. Counter?`,
+        options: [
+          { text: 'Promise economic relief', effect: 18, chaos: 4 },
+          { text: 'Announce leadership reshuffle', effect: 15, chaos: 9 },
+          { text: 'Go on the offensive', effect: 15, chaos: 12 },
+          { text: 'Appeal to unity', effect: 10, chaos: 4 },
+        ],
+      },
+      {
+        question: `A scandal from your past resurfaces. ${this.opponent.name} is exploiting it.`,
+        options: [
+          { text: 'Deny and deflect', effect: 8, chaos: 8 },
+          { text: 'Offer public apology', effect: 12, chaos: 3 },
+          { text: 'Threaten legal action', effect: 13, chaos: 10 },
+          { text: 'Make light of it', effect: 12, chaos: 4 },
+        ],
+      },
+      {
+        question: `Final showdown: ${this.opponent.name} challenges you to a public debate.`,
+        options: [
+          { text: 'Accept immediately and prepare', effect: 28, chaos: 6 },
+          { text: 'Set strict conditions', effect: 18, chaos: 2 },
+          { text: 'Avoid and stall', effect: -5, chaos: 3 },
+          { text: 'Accept and attack', effect: 25, chaos: 15 },
+        ],
+      },
+    ];
+
+    this.rounds = topics.slice(0, this.maxRounds);
+  }
+
+  render() {
+    const existing = document.querySelector('.public-opinion-battle');
+    if (existing) existing.remove();
+
+    const battle = document.createElement('div');
+    battle.className = 'public-opinion-battle';
+    this.battleElement = battle;
+
+    this.updateBattleUI();
+
+    const crisisPanel = document.getElementById('crisisPanel');
+    if (crisisPanel) {
+      crisisPanel.insertAdjacentElement('afterend', battle);
+    } else {
+      document.querySelector('.game-container').appendChild(battle);
+    }
+  }
+
+  updateBattleUI() {
+    if (!this.battleElement) return;
+
+    const timeLeft = Math.max(0, Math.ceil((this.duration - (Date.now() - this.startTime)) / 1000));
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+
+    const round = this.rounds[this.currentRound];
+    const isComplete = this.currentRound >= this.maxRounds;
+
+    this.battleElement.innerHTML = `
+      <div class="battle-header">
+        <h4>Public Opinion Battle: ${this.topic}</h4>
+        <div class="battle-timer">${minutes}:${seconds.toString().padStart(2, '0')}</div>
+      </div>
+
+      <div class="battle-progress">
+        ${Array.from({ length: this.maxRounds }).map((_, i) => `
+          <div class="battle-progress-dot ${i < this.currentRound ? 'completed' : (i === this.currentRound ? 'active' : '')}"></div>
+        `).join('')}
+      </div>
+
+      <div class="battle-scores-container">
+        <div class="battle-score-item">
+          <div class="battle-score-label">
+            <span style="color: var(--primary-gold); font-size: 18px;">${Math.round(this.playerScore)}%</span>
+          </div>
+          <div class="battle-score-bar">
+            <div class="battle-score-fill player" style="width: ${this.playerScore}%"></div>
+          </div>
+        </div>
+
+        <div class="battle-score-item">
+          <div class="battle-score-label">
+            <span>${this.opponent.name}</span>
+            <span style="color: inherit; font-size: 18px;">${Math.round(this.opponentScore)}%</span>
+          </div>
+          <div class="battle-score-bar">
+            <div class="battle-score-fill opponent" style="width: ${this.opponentScore}%"></div>
+          </div>
+        </div>
+      </div>
+
+      ${!isComplete ? `
+        <div class="battle-interactive">
+          <div class="battle-question">
+            <strong>Round ${this.currentRound + 1}/${this.maxRounds}</strong><br>
+            ${round.question}
+          </div>
+
+          <div class="battle-options">
+            ${round.options.map((option, i) => `
+              <button class="battle-option-btn" data-index="${i}">
+                ${option.text}
+                <div class="battle-option-effect">
+                  ${option.effect >= 0 ? '+' : ''}${option.effect}${option.chaos ? ` · chaos: ${option.chaos}` : ''}
+                </div>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="battle-powerups">
+        ${Object.entries(this.powerups).map(([key, powerup]) => `
+          <div class="battle-powerup ${powerup.used ? 'used' : ''}" data-powerup="${key}">
+            <span>${this.getPowerupIcon(key)}</span>
+            <span style="margin-left: auto;">${powerup.used ? 'USED' : `-${powerup.cost} energy`}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // Add event listeners
+    if (!isComplete) {
+      this.battleElement.querySelectorAll('.battle-option-btn').forEach(btn => {
+        btn.onclick = () => this.handleChoice(parseInt(btn.dataset.index));
+      });
+      this.battleElement.querySelectorAll('.battle-powerup').forEach(btn => {
+        btn.onclick = () => this.usePowerup(btn.dataset.powerup);
+      });
+    }
+  }
+
+  handleChoice(index) {
+    const round = this.rounds[this.currentRound];
+    const option = round.options[index];
+
+    // Calculate outcomes (weighted by their aggression)
+    const opponentResponse = Math.random() * (this.opponent.aggression / 10);
+
+    this.playerScore = Math.min(100, Math.max(0, this.playerScore + option.effect - opponentResponse));
+    this.opponentScore = Math.max(0, Math.min(100, this.opponentScore + opponentResponse - (option.effect / 2)));
+
+    // Store round result
+    this.rounds[this.currentRound].playerEffect = option.effect;
+
+    // Move to next round
+    if (this.currentRound >= this.maxRounds || (Date.now() - this.startTime >= this.duration)) {
+      this.endBattle();
+    } else {
+      this.currentRound++;
+      this.updateBattleUI();
+    }
+  }
+
+  usePowerup(powerupKey) {
+    const powerup = this.powerups[powerupKey];
+    if (!powerup || (this.game.energy < powerup.cost)) {
+      this.game.showNotification('Cannot use power-up', 'warning');
+      return;
+    }
+
+    powerup.used = true;
+    this.playerScore = Math.min(100, this.playerScore + powerup.effect);
+    this.opponentScore = Math.max(0, this.opponentScore - (powerup.effect / 2));
+
+    this.game.state.applyEffects({
+      power: '+ opinion-battle power-up',
+    });
+
+    this.game.inbox.addNotification(`Used ${this.getPowerupName(powerupKey)}!`, 'success');
+    this.updateBattleUI();
+  }
+
+  getPowerupIcon(key) {
+    const icons = { mediaSpin: '🌀', populistAppeal: '📣', factCheck: '🧾' };
+    return icons[key] || '✨';
+  }
+
+  getPowerupName(key) {
+    const names = { mediaSpin: 'Media Spin', populistAppeal: 'Populist Appeal', factCheck: 'Fact Check' };
+    return names[key] || key;
+  }
+
+  renderResult() {
+    const won = this.playerScore > this.opponentScore;
+    const margin = Math.abs(this.playerScore - this.opponentScore);
+
+    return `
+      <div class="battle-result ${won ? 'victory' : 'defeat'}">
+        <h3>${won ? '🏆 VICTORY!' : '❌ DEFEAT'}</h3>
+        <p style="font-size: 16px; margin: 18px 0;">
+          ${won
+            ? `${this.opponent.name} by ${Math.round(margin)} points!`
+            : `${this.opponent.name} defeated you by ${Math.round(margin)} points.`}
+        </p>
+
+        <div class="battle-result-effects">
+          <div class="battle-result-effect">Public Opinion: ${Math.round(margin * 0.5)}%</div>
+          <div class="battle-result-effect">Public Support: ${Math.round(margin * 0.3)}%</div>
+          <div class="battle-result-effect">Chaos: ${Math.round(margin * 0.2)}%</div>
+        </div>
+
+        <button class="close-modal" onclick="this.closest('.public-opinion-battle').remove()" style="margin-top: 20px;">Close</button>
+      </div>
+    `;
+  }
+
+  endBattle() {
+    const won = this.playerScore > this.opponentScore;
+    const margin = Math.abs(this.playerScore - this.opponentScore);
+
+    if (won) {
+      this.game.state.applyEffects({ power: `+ public: margin x 0.5`, scoreDelta: margin * 1.5, chaosDelta: 5 });
+      this.game.inbox.addNotification(
+        `🏆 Victory in public opinion battle against ${this.opponent.name}! Public support increased by ${Math.round(margin * 0.5)}%.`,
+        'success',
+        { opponent: this.opponent.name, topic: this.topic, margin: Math.round(margin) },
+      );
+    } else {
+      this.game.state.applyEffects({ power: `- public: margin x 0.5`, scoreDelta: -margin * 0.5, chaosDelta: 5 });
+      this.game.inbox.addNotification(
+        `Lost this topic's opinion battle to ${this.opponent.name}. Public support decreased.`,
+        'warning',
+        { opponent: this.opponent.name, topic: this.topic, margin: Math.round(margin) },
+      );
+    }
+
+    this.updateBattleUI();
+  }
+
+  startTimer() {
+    this.timerInterval = setInterval(() => {
+      const timeLeft = Math.max(0, this.duration - (Date.now() - this.startTime));
+      if (timeLeft <= 0) {
+        clearInterval(this.timerInterval);
+        if (this.currentRound < this.maxRounds) this.endBattle();
+        else this.updateBattleUI();
+      }
+    }, 1000);
+  }
+}
+
 class PresidentGame {
     constructor() {
         // POWER CENTERS - The Core System
@@ -190,6 +746,9 @@ class PresidentGame {
             powerChanges: [],
             crises: []
         };
+
+        this.inbox = new NotificationInbox(this);
+        this.activeBattles = [];
 
         this.notifications = [];
         this.maxVisibleNotifications = 5;
@@ -1944,20 +2503,23 @@ class PresidentGame {
 
     // PUBLIC OPINION BATTLES
     createPublicOpinionBattle(opponent, response, analysis) {
-        const battle = {
-            id: Date.now(),
-            opponent: opponent,
-            topic: this.extractTopic(response.content),
-            playerScore: 50,
-            opponentScore: 50,
-            startTime: Date.now(),
-            duration: 300000, // 5 minutes
-            viralMultiplier: analysis.viralPotential / 10,
-            controversyLevel: analysis.controversyLevel
-        };
+        const battle = new PublicOpinionBattleGame(
+            this,
+            opponent,
+            this.extractTopic(response.content),
+            {
+                playerScore: 50,
+                opponentScore: 50,
+            }
+        );
 
-        this.publicOpinionBattles.push(battle);
-        this.showPublicOpinionBattle(battle);
+        this.activeBattles.push(battle);
+
+        this.inbox.addNotification(
+            `🗞️ New public opinion battle started with ${opponent.name} over ${battle.topic}!`,
+            'info',
+            { opponent: opponent.name, topic: battle.topic }
+        );
     }
 
     // EXTRACT TOPIC FROM TWEET
@@ -2378,24 +2940,41 @@ class PresidentGame {
 
     async fetchRealPoliticalNews() {
         try {
+            // Use Guardian API instead of NewsAPI
             const response = await fetch(
-                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR scandal OR military OR healthcare)&' +
-                'language=en&sortBy=publishedAt&pageSize=15'
+                '/api/guardian?' +
+                'q=politics OR congress OR president OR senate OR china OR russia OR economy OR scandal OR military OR healthcare&' +
+                'section=politics,us-news,world&' +
+                'pageSize=15&' +
+                'orderBy=newest'
             );
 
-            if (!response.ok) throw new Error('NewsAPI failed');
+            if (!response.ok) throw new Error('Guardian API failed');
 
             const data = await response.json();
             
-            if (!data.articles || data.articles.length === 0) throw new Error('No articles');
+            if (!data.response || !data.response.results || data.response.results.length === 0) {
+                throw new Error('No articles');
+            }
 
-            const newsStories = data.articles.map(article => ({
-                headline: article.title,
-                source: article.source.name,
-                relevance: this.calculateRelevance(article.title, article.description),
-                category: this.categorizeNews(article.title, article.description),
-                affectedCenters: this.identifyAffectedCenters(article.title, article.description),
-                timestamp: new Date(article.publishedAt).getTime()
+            // Transform Guardian API format to internal format
+            const newsStories = data.response.results.map(article => ({
+                headline: article.webTitle,
+                source: article.sectionName || 'The Guardian',
+                description: article.fields?.trailText || '',
+                relevance: this.calculateRelevance(
+                    article.webTitle, 
+                    article.fields?.trailText || ''
+                ),
+                category: this.categorizeNews(
+                    article.webTitle, 
+                    article.fields?.trailText || ''
+                ),
+                affectedCenters: this.identifyAffectedCenters(
+                    article.webTitle, 
+                    article.fields?.trailText || ''
+                ),
+                timestamp: new Date(article.webPublicationDate).getTime()
             }));
 
             // Merge with existing stories and deduplicate
@@ -2412,10 +2991,11 @@ class PresidentGame {
                 setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
-            console.log('✅ Fetched', newsStories.length, 'new stories from NewsAPI');
+            console.log('✅ Fetched', newsStories.length, 'new stories from Guardian API');
             
         } catch (error) {
-            console.error('News fetch failed:', error);
+            console.error('Guardian API fetch failed:', error);
+            // Fall back to RSS
             await this.fetchRSSNews();
         }
     }
@@ -3337,10 +3917,14 @@ class PresidentGame {
         document.body.appendChild(modal);
 
         // Auto-dismiss after 15 seconds
+        const modalId = `breaking-${Date.now()}`;
+        modal.id = modalId;
+
         setTimeout(() => {
-            if (modal.parentNode) {
+            const currentModal = document.getElementById(modalId);
+            if (currentModal && currentModal.parentNode) {
                 this.state.applyEffects({ chaosDelta: 10 }, { source: 'breaking-news-timeout' });
-                modal.remove();
+                currentModal.remove();
                 this.showNotification('⚠️ Ignored breaking news - chaos increased!');
             }
         }, 15000);
@@ -3676,34 +4260,32 @@ class PresidentGame {
         }
     }
 
-    showNotification(message, type = 'info', duration = 4000, dismissible = true) {
+    showNotification(message, type = 'info', duration = 10000, dismissible = true, metadata = {}) {
         const id = this.notificationId++;
+
+        // Add to inbox
+        const inboxNotificationId = this.inbox.addNotification(message, type, metadata);
 
         const notification = {
             id,
             message: this.sanitizeText(message),
             type,
             timestamp: Date.now(),
-            duration
+            duration,
+            metadata,
         };
 
         this.notifications.push(notification);
 
         const notifEl = document.createElement('div');
-        notifEl.className = `notification ${type}`;
-        notifEl.id = `notification-${id}`;
+        notifEl.className = 'notification';
         notifEl.dataset.notificationId = id;
 
-        const icons = {
-            info: 'ℹ️',
-            success: '✅',
-            warning: '⚠️',
-            error: '❌'
-        };
+        const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' };
 
         const icon = document.createElement('div');
         icon.className = 'notification-icon';
-        icon.textContent = icons[type] || 'ℹ️';
+        icon.textContent = icons[type] || '';
 
         const content = document.createElement('div');
         content.className = 'notification-content';
@@ -3712,13 +4294,25 @@ class PresidentGame {
         notifEl.appendChild(icon);
         notifEl.appendChild(content);
 
+        if (inboxNotificationId) {
+            notifEl.dataset.inboxNotificationId = inboxNotificationId;
+        }
+
+        // Click to expand
+        notifEl.onclick = () => {
+            this.inbox.openNotificationDetail(inboxNotificationId ?? this.inbox.notifications.find(n => n.message === message)?.id);
+        };
+
         if (dismissible) {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'notification-close';
             closeBtn.type = 'button';
-            closeBtn.setAttribute('aria-label', 'Close notification');
-            closeBtn.innerHTML = '×';
-            closeBtn.onclick = () => this.dismissNotification(id);
+            closeBtn.textContent = '×';
+            closeBtn.ariaLabel = 'Close notification';
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.dismissNotification(id);
+            };
             notifEl.appendChild(closeBtn);
         }
 
@@ -3730,11 +4324,10 @@ class PresidentGame {
         }
 
         this.enforceNotificationLimit();
-        return id;
     }
 
     dismissNotification(id) {
-        const notifEl = document.getElementById(`notification-${id}`);
+        const notifEl = document.querySelector(`[data-notification-id="${id}"]`);
         if (notifEl) {
             notifEl.style.animation = 'slideOutRight 0.4s ease-in forwards';
             setTimeout(() => notifEl.remove(), 400);
