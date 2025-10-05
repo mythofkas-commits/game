@@ -30,22 +30,15 @@ export default async function handler(req, res) {
       return res.status(200).json({
         response: {
           results: [
-            {
-              webTitle: 'Congress Debates Major Infrastructure Legislation',
-              sectionName: 'US Politics',
-              webPublicationDate: new Date().toISOString(),
-              fields: {
-                trailText: 'Bipartisan discussions continue on infrastructure funding'
-              }
-            },
-            {
-              webTitle: 'International Relations Tensions Rise',
-              sectionName: 'World News',
-              webPublicationDate: new Date().toISOString(),
-              fields: {
-                trailText: 'Diplomatic discussions ongoing'
-              }
-            }
+            // {
+            //   webTitle: 'Congress Debates Major Infrastructure Legislation',
+            //   sectionName: 'US Politics',
+            //   webPublicationDate: new Date().toISOString(),
+            //   fields: {
+            //     trailText: 'Bipartisan discussions continue on infrastructure funding with key lawmakers meeting to negotiate final details of the comprehensive bill.',
+            //     bodyText: 'Congressional leaders are working to finalize a major infrastructure package that could reshape American infrastructure for decades. The legislation includes provisions for roads, bridges, broadband expansion, and clean energy initiatives.'
+            //   }
+            // }
           ]
         }
       });
@@ -57,7 +50,7 @@ export default async function handler(req, res) {
     url.searchParams.set('section', section);
     url.searchParams.set('page-size', pageSize.toString());
     url.searchParams.set('order-by', orderBy);
-    url.searchParams.set('show-fields', 'trailText,thumbnail,bodyText');
+    url.searchParams.set('show-fields', 'trailText,thumbnail,bodyText,standfirst');
     url.searchParams.set('api-key', GUARDIAN_API_KEY);
 
     const response = await fetch(url.toString(), {
@@ -86,26 +79,19 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Guardian API error:', error);
     
-    // Return mock data as fallback
+    // Return mock data as fallback (commented out to avoid showing stale stories)
     res.status(200).json({
       response: {
         results: [
-          {
-            webTitle: 'Political Development in Washington',
-            sectionName: 'US Politics',
-            webPublicationDate: new Date().toISOString(),
-            fields: {
-              trailText: 'Major political story developing in the capital'
-            }
-          },
-          {
-            webTitle: 'International Relations Update',
-            sectionName: 'World News',
-            webPublicationDate: new Date().toISOString(),
-            fields: {
-              trailText: 'Diplomatic relations continue to evolve'
-            }
-          }
+          // {
+          //   webTitle: 'Political Development in Washington',
+          //   sectionName: 'US Politics',
+          //   webPublicationDate: new Date().toISOString(),
+          //   fields: {
+          //     trailText: 'Major political story developing in the capital',
+          //     bodyText: 'Detailed coverage of ongoing political developments...'
+          //   }
+          // }
         ]
       }
     });

@@ -1913,3 +1913,36 @@ body {
         flex-direction: column;
     }
 }
+
+/* Crisis Summary Styling */
+.crisis-summary {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.crisis-summary details {
+    margin-top: 10px;
+}
+
+.crisis-summary summary {
+    cursor: pointer;
+    color: var(--primary-gold);
+    font-weight: 600;
+    padding: 8px 12px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 8px;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.crisis-summary summary:hover {
+    background: rgba(255, 215, 0, 0.2);
+    transform: translateX(5px);
+}
+
+.crisis-summary details[open] summary {
+    margin-bottom: 10px;
+    background: rgba(255, 215, 0, 0.15);
+}

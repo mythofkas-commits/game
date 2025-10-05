@@ -51,7 +51,7 @@ class NotificationInbox {
         this.unreadCount = data.unreadCount || 0;
       }
     } catch (e) {
-      console.warn('Failed to load notification inbox:', e);
+      console.warn('failed to load notification inbox:', e);
     }
   }
 
@@ -1603,10 +1603,18 @@ class PresidentGame {
         // Wait for REAL news to load (no mock news)
         await this.fetchRealPoliticalNews();
         
-        // If we have news, hide loading and start game
+        // If we have news, hide loading and prompt interaction
         if (this.currentNewsStories.length > 0) {
             this.hideLoadingScreen();
-            setTimeout(() => this.generateContextualCrisis(), 500);
+            const crisisPanel = document.getElementById('crisisPanel');
+            if (crisisPanel) {
+                crisisPanel.style.display = 'none';
+            }
+            this.showNotification(
+                '📰 Click any news headline to respond to breaking events!',
+                'info',
+                15000
+            );
         } else {
             // If news failed, show error
             this.showLoadingError();
@@ -1952,15 +1960,15 @@ class PresidentGame {
             const modal = document.querySelector('.breaking-news-modal');
             if (modal) modal.remove();
             
-            // Generate next crisis
-            setTimeout(() => {
-                if (this.currentNewsStories.length > 0) {
-                    const randomNews = this.currentNewsStories[Math.floor(this.rand() * this.currentNewsStories.length)];
-                    this.generateAdaptiveCrisis(randomNews);
-                } else {
-                    this.generateContextualCrisis();
-                }
-            }, 2000);
+            this.showNotification(
+                '📰 Crisis resolved. Select another headline when you are ready to respond again.',
+                'info',
+                10000
+            );
+            const crisisPanel = document.getElementById('crisisPanel');
+            if (crisisPanel) {
+                crisisPanel.style.display = 'none';
+            }
         }
     }
 
@@ -2959,22 +2967,29 @@ class PresidentGame {
 
             // Transform Guardian API format to internal format
             const newsStories = data.response.results.map(article => {
-                const trailText = article.fields?.trailText || '';
+                const summary = article.fields?.standfirst
+                    || article.fields?.trailText
+                    || (article.fields?.bodyText ? article.fields.bodyText.substring(0, 300) : null)
+                    || 'Click to read more about this developing story.';
+
+                const fullText = article.fields?.bodyText || summary;
+
                 return {
                     headline: article.webTitle,
                     source: article.sectionName || 'The Guardian',
-                    description: trailText,
+                    description: summary,
+                    fullText,
                     relevance: this.calculateRelevance(
-                        article.webTitle, 
-                        trailText
+                        article.webTitle,
+                        summary
                     ),
                     category: this.categorizeNews(
-                        article.webTitle, 
-                        trailText
+                        article.webTitle,
+                        summary
                     ),
                     affectedCenters: this.identifyAffectedCenters(
-                        article.webTitle, 
-                        trailText
+                        article.webTitle,
+                        summary
                     ),
                     timestamp: new Date(article.webPublicationDate).getTime()
                 };
@@ -3330,9 +3345,14 @@ class PresidentGame {
 
     respondToNews(story) {
         console.log('📰 Responding to:', story.headline);
+
         this.generateAdaptiveCrisis(story);
+
         const safeHeadline = this.sanitizeText(story.headline);
-        this.showNotification(`⚡ ${safeHeadline.substring(0, 60)}...`);
+        this.showNotification(
+            `📰 Responding to: ${safeHeadline.substring(0, 50)}...`,
+            'info'
+        );
     }
 
     // ============= ADAPTIVE CRISIS GENERATION =============
@@ -3341,10 +3361,12 @@ class PresidentGame {
         try {
             const headline = story?.headline || 'Developing situation';
             const category = story?.category || 'domestic';
+            const description = story?.description || '';
+            const fullText = story?.fullText || description;
 
             const identified = Array.isArray(story?.affectedCenters) && story.affectedCenters.length > 0
                 ? story.affectedCenters
-                : this.identifyAffectedCenters(headline, story?.description || '') || [];
+                : this.identifyAffectedCenters(headline, description) || [];
             const affectedCenters = identified.length > 0
                 ? identified
                 : this.guessAffectedCenters(category);
@@ -3361,8 +3383,9 @@ class PresidentGame {
 
             this.currentCrisis = {
                 newsStory: story,
-                title: `URGENT: ${headline}`,
-                description: this.generateCrisisDescription(story, affectedCenters),
+                title: `RESPOND: ${headline}`,
+                description,
+                fullText,
                 affectedCenters,
                 options
             };
@@ -3382,8 +3405,9 @@ class PresidentGame {
             console.error('Crisis generation error:', err);
             this.currentCrisis = {
                 newsStory: story,
-                title: 'URGENT: Crisis Requires Response',
-                description: 'Immediate action needed',
+                title: 'RESPOND: Crisis Requires Response',
+                description: story?.description || 'Immediate action needed',
+                fullText: story?.fullText || story?.description || 'Immediate action needed',
                 affectedCenters: ['congress', 'public'],
                 options: this.generateHandcraftedOptions(story, ['congress', 'public'])
             };
@@ -3737,47 +3761,78 @@ class PresidentGame {
     displayCrisis() {
         if (!this.currentCrisis) return;
 
+        const crisisPanel = document.getElementById('crisisPanel');
+        if (crisisPanel) {
+            crisisPanel.style.display = 'block';
+        }
+
         const crisis = this.currentCrisis;
 
         this.assert(Array.isArray(crisis.options) && crisis.options.length, 'crisis has no options');
         this.assert(Number.isFinite(this.chaos) && this.chaos >= 0 && this.chaos <= 100, 'chaos out of range');
 
         this.safeSetText('crisisTitle', this.sanitizeText(crisis.title));
-        this.safeSetText('crisisDescription', this.sanitizeText(crisis.description));
 
-        // Show affected power centers
+        const descriptionEl = document.getElementById('crisisDescription');
+        if (descriptionEl) {
+            const safeDescription = this.sanitizeText(crisis.description || '');
+            const safeFullText = this.sanitizeText(crisis.fullText || crisis.description || '');
+
+            descriptionEl.innerHTML = `
+                <div class="crisis-summary">
+                    <p style="color: #ddd; line-height: 1.6; margin-bottom: 15px;">${safeDescription}</p>
+                    ${crisis.fullText && crisis.fullText !== crisis.description ? `
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-gold); font-weight: 600; margin-bottom: 10px;">
+                                📰 Read Full Story
+                            </summary>
+                            <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; color: #ddd; line-height: 1.6; margin-top: 10px;">
+                                ${safeFullText.substring(0, 800)}${safeFullText.length > 800 ? '...' : ''}
+                            </div>
+                        </details>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         const affectedEl = document.getElementById('affectedCenters');
-        affectedEl.innerHTML = '';
-        crisis.affectedCenters.forEach(id => {
-            const center = this.powerCenters.find(p => p.id === id);
-            if (!center) return;
-            const badge = document.createElement('span');
-            badge.className = 'affected-badge';
-            badge.textContent = `${center.icon} ${center.name}`;
-            affectedEl.appendChild(badge);
-        });
+        if (affectedEl) {
+            affectedEl.innerHTML = '';
+            crisis.affectedCenters.forEach(id => {
+                const center = this.powerCenters.find(p => p.id === id);
+                if (!center) return;
+                const badge = document.createElement('span');
+                badge.className = 'affected-badge';
+                badge.textContent = `${center.icon} ${center.name}`;
+                affectedEl.appendChild(badge);
+            });
+        }
 
         const optionsDiv = document.getElementById('crisisOptions');
-        optionsDiv.innerHTML = '';
+        if (optionsDiv) {
+            optionsDiv.innerHTML = '';
 
-        crisis.options.forEach(option => {
-            const btn = document.createElement('button');
-            btn.classList.add('decision-btn');
-            btn.setAttribute('data-testid', 'decision-btn');
-            const label = document.createElement('span');
-            label.textContent = this.sanitizeText(option.text);
-            btn.appendChild(label);
+            crisis.options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.classList.add('decision-btn');
+                btn.setAttribute('data-testid', 'decision-btn');
+                const label = document.createElement('span');
+                label.textContent = this.sanitizeText(option.text);
+                btn.appendChild(label);
 
-            const preview = document.createElement('div');
-            preview.className = 'option-preview';
-            preview.textContent = `Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} | Energy: -${option.energy}`;
-            btn.appendChild(preview);
-            btn.onclick = () => this.handleDecision(option);
-            optionsDiv.appendChild(btn);
-        });
+                const preview = document.createElement('div');
+                preview.className = 'option-preview';
+                preview.textContent = `Chaos: ${option.chaos > 0 ? '+' : ''}${option.chaos} | Energy: -${option.energy}`;
+                btn.appendChild(preview);
+                btn.onclick = () => this.handleDecision(option);
+                optionsDiv.appendChild(btn);
+            });
+        }
 
-        // Scroll crisis into view
-        document.getElementById('crisisPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const panel = document.getElementById('crisisPanel');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
 
     handleDecision(option) {
@@ -3848,13 +3903,9 @@ class PresidentGame {
         setTimeout(() => {
             if (crisisPanel) {
                 crisisPanel.style.opacity = '1';
+                crisisPanel.style.display = 'none';
             }
-            if (this.currentNewsStories.length > 0) {
-                const randomNews = this.currentNewsStories[Math.floor(this.rand() * this.currentNewsStories.length)];
-                this.generateAdaptiveCrisis(randomNews);
-            } else {
-                this.generateContextualCrisis();
-            }
+            this.currentCrisis = null;
         }, 1000);
     }
 
@@ -3879,11 +3930,12 @@ class PresidentGame {
         title.textContent = this.sanitizeText(story.headline);
         content.appendChild(title);
 
-        const desc = document.createElement('p');
-        desc.style.color = '#ddd';
-        desc.style.margin = '20px 0';
-        desc.textContent = 'This requires immediate presidential response!';
-        content.appendChild(desc);
+        const summary = document.createElement('p');
+        summary.style.color = '#ddd';
+        summary.style.margin = '20px 0';
+        summary.style.lineHeight = '1.6';
+        summary.textContent = this.sanitizeText(story.description || 'This requires immediate presidential response!');
+        content.appendChild(summary);
 
         const centers = document.createElement('div');
         centers.className = 'breaking-power-centers';
@@ -4000,14 +4052,8 @@ class PresidentGame {
     // ============= EXISTING SYSTEMS =============
 
     generateContextualCrisis() {
-        // Fallback crisis generator
-        const mockStory = {
-            headline: 'Domestic Policy Deadlock in Congress',
-            source: 'Political Wire',
-            category: 'domestic',
-            affectedCenters: ['congress', 'public']
-        };
-        this.generateAdaptiveCrisis(mockStory);
+        // DISABLED: Crisis panel only shows when clicking a news headline
+        this.showNotification('⚠️ Crisis panel disabled - click news to respond', 'info');
     }
 
     gameLoop() {
