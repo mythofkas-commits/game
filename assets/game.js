@@ -51,7 +51,7 @@ class NotificationInbox {
         this.unreadCount = data.unreadCount || 0;
       }
     } catch (e) {
-      console.warn('failed to load notification inbox:', e);
+      console.warn('Failed to load notification inbox:', e);
     }
   }
 
