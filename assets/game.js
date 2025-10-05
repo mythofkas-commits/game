@@ -2958,24 +2958,27 @@ class PresidentGame {
             }
 
             // Transform Guardian API format to internal format
-            const newsStories = data.response.results.map(article => ({
-                headline: article.webTitle,
-                source: article.sectionName || 'The Guardian',
-                description: article.fields?.trailText || '',
-                relevance: this.calculateRelevance(
-                    article.webTitle, 
-                    article.fields?.trailText || ''
-                ),
-                category: this.categorizeNews(
-                    article.webTitle, 
-                    article.fields?.trailText || ''
-                ),
-                affectedCenters: this.identifyAffectedCenters(
-                    article.webTitle, 
-                    article.fields?.trailText || ''
-                ),
-                timestamp: new Date(article.webPublicationDate).getTime()
-            }));
+            const newsStories = data.response.results.map(article => {
+                const trailText = article.fields?.trailText || '';
+                return {
+                    headline: article.webTitle,
+                    source: article.sectionName || 'The Guardian',
+                    description: trailText,
+                    relevance: this.calculateRelevance(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    category: this.categorizeNews(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    affectedCenters: this.identifyAffectedCenters(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    timestamp: new Date(article.webPublicationDate).getTime()
+                };
+            });
 
             // Merge with existing stories and deduplicate
             const allStories = [...this.currentNewsStories, ...newsStories];
