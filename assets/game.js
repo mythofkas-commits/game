@@ -4053,7 +4053,7 @@ class PresidentGame {
 
     generateContextualCrisis() {
         // DISABLED: Crisis panel only shows when clicking a news headline
-        console.log('⚠️ Crisis panel disabled - click news to respond');
+        this.showNotification('⚠️ Crisis panel disabled - click news to respond', 'info');
     }
 
     gameLoop() {
