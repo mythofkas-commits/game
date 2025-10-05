@@ -6,7 +6,7 @@ A real-time political simulation game with live news integration, relationship m
 
 ## Features
 
-- **Real-time News Integration**: Fetches live political news via NewsAPI and RSS feeds
+- **Real-time News Integration**: Pulls live political coverage from The Guardian API with RSS fallbacks
 - **Dynamic Crisis Generation**: News events trigger contextual political crises
 - **Relationship Management**: Track trust, respect, and fear with key political figures
 - **Tweet Storm System**: Send tweets that affect chaos levels and relationships
@@ -19,7 +19,8 @@ A real-time political simulation game with live news integration, relationship m
 ### Local Development
 
 1. Clone the repository
-2. Copy `.env.example` to `.env.local` and add your NewsAPI key
+2. Copy `.env.example` to `.env.local` and add your Guardian API key (optional if you rely on the built-in mock data)
+   - Keep `.env.local` out of source control; it is ignored by `.gitignore`.
 3. Run a local server:
    ```bash
    python3 -m http.server 8000
@@ -28,12 +29,13 @@ A real-time political simulation game with live news integration, relationship m
 
 ## API Endpoints
 
-- `/api/news.js`: Secure NewsAPI proxy with CORS handling
+- `/api/guardian.js`: Serverless Guardian API proxy with graceful fallbacks
+- `/api/news.js`: (Optional) Legacy NewsAPI proxy retained for backup scenarios
 - `/api/rss.js`: RSS feed parser for backup news sources
 
 ## Security Features
 
-- API keys are protected server-side in Vercel functions
+- API keys are protected server-side in Vercel functions and never committed to git
 - CORS properly configured for cross-origin requests
 - Graceful fallback to mock data when APIs are unavailable
 - Input sanitization for user-generated content
@@ -50,7 +52,7 @@ A real-time political simulation game with live news integration, relationship m
 - Vanilla JavaScript (ES6+)
 - CSS3 with animations and responsive design
 - Vercel Serverless Functions for API security
-- NewsAPI and RSS feeds for real-time data
+- The Guardian API (with NewsAPI + RSS fallbacks) for real-time data
 
 ## Notification Inbox & Public Opinion Battle Setup
 

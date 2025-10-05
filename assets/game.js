@@ -51,7 +51,7 @@ class NotificationInbox {
         this.unreadCount = data.unreadCount || 0;
       }
     } catch (e) {
-      console.warn('failed to load notification inbox:', e);
+      console.warn('Failed to load notification inbox:', e);
     }
   }
 
@@ -2940,25 +2940,45 @@ class PresidentGame {
 
     async fetchRealPoliticalNews() {
         try {
+            // Use Guardian API instead of NewsAPI
             const response = await fetch(
-                '/api/news?q=(politics OR congress OR president OR senate OR china OR russia OR economy OR scandal OR military OR healthcare)&' +
-                'language=en&sortBy=publishedAt&pageSize=15'
+                '/api/guardian?' +
+                'q=politics OR congress OR president OR senate OR china OR russia OR economy OR scandal OR military OR healthcare&' +
+                'section=politics,us-news,world&' +
+                'pageSize=15&' +
+                'orderBy=newest'
             );
 
-            if (!response.ok) throw new Error('NewsAPI failed');
+            if (!response.ok) throw new Error('Guardian API failed');
 
             const data = await response.json();
             
-            if (!data.articles || data.articles.length === 0) throw new Error('No articles');
+            if (!data.response || !data.response.results || data.response.results.length === 0) {
+                throw new Error('No articles');
+            }
 
-            const newsStories = data.articles.map(article => ({
-                headline: article.title,
-                source: article.source.name,
-                relevance: this.calculateRelevance(article.title, article.description),
-                category: this.categorizeNews(article.title, article.description),
-                affectedCenters: this.identifyAffectedCenters(article.title, article.description),
-                timestamp: new Date(article.publishedAt).getTime()
-            }));
+            // Transform Guardian API format to internal format
+            const newsStories = data.response.results.map(article => {
+                const trailText = article.fields?.trailText || '';
+                return {
+                    headline: article.webTitle,
+                    source: article.sectionName || 'The Guardian',
+                    description: trailText,
+                    relevance: this.calculateRelevance(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    category: this.categorizeNews(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    affectedCenters: this.identifyAffectedCenters(
+                        article.webTitle, 
+                        trailText
+                    ),
+                    timestamp: new Date(article.webPublicationDate).getTime()
+                };
+            });
 
             // Merge with existing stories and deduplicate
             const allStories = [...this.currentNewsStories, ...newsStories];
@@ -2974,10 +2994,11 @@ class PresidentGame {
                 setTimeout(() => this.triggerBreakingNews(breakingNews[0]), 2000);
             }
 
-            console.log('✅ Fetched', newsStories.length, 'new stories from NewsAPI');
+            console.log('✅ Fetched', newsStories.length, 'new stories from Guardian API');
             
         } catch (error) {
-            console.error('News fetch failed:', error);
+            console.error('Guardian API fetch failed:', error);
+            // Fall back to RSS
             await this.fetchRSSNews();
         }
     }
@@ -4246,7 +4267,7 @@ class PresidentGame {
         const id = this.notificationId++;
 
         // Add to inbox
-        this.inbox.addNotification(message, type, metadata);
+        const inboxNotificationId = this.inbox.addNotification(message, type, metadata);
 
         const notification = {
             id,
@@ -4276,9 +4297,13 @@ class PresidentGame {
         notifEl.appendChild(icon);
         notifEl.appendChild(content);
 
+        if (inboxNotificationId) {
+            notifEl.dataset.inboxNotificationId = inboxNotificationId;
+        }
+
         // Click to expand
         notifEl.onclick = () => {
-            this.inbox.openNotificationDetail(this.inbox.notifications.find(n => n.message === message)?.id);
+            this.inbox.openNotificationDetail(inboxNotificationId ?? this.inbox.notifications.find(n => n.message === message)?.id);
         };
 
         if (dismissible) {
