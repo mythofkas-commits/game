@@ -2994,7 +2994,7 @@ class PresidentGame {
             console.log('✅ Fetched', newsStories.length, 'new stories from Guardian API');
             
         } catch (error) {
-            console.error('Guardian API fetch failed:', error);
+            console.error('Guardian API fetch Failed:', error);
             // Fall back to RSS
             await this.fetchRSSNews();
         }
