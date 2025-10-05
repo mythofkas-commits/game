@@ -361,7 +361,7 @@ body {
 }
 
 .notification-close::before {
-    content: '×';
+    /* content: '×'; Removed to avoid duplicate "×" symbol */
     font-size: 20px;
     line-height: 1;
 }
