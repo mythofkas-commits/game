@@ -2972,7 +2972,7 @@ class PresidentGame {
                     || (article.fields?.bodyText ? article.fields.bodyText.substring(0, 300) : null)
                     || 'Click to read more about this developing story.';
 
-                const fullText = article.fields?.bodyText || summary;
+                const fullText = article.fields?.bodyText || null;
 
                 return {
                     headline: article.webTitle,
@@ -3776,18 +3776,23 @@ class PresidentGame {
         const descriptionEl = document.getElementById('crisisDescription');
         if (descriptionEl) {
             const safeDescription = this.sanitizeText(crisis.description || '');
-            const safeFullText = this.sanitizeText(crisis.fullText || crisis.description || '');
+            const safeFullText = this.sanitizeText(crisis.fullText || '');
+
+            const desc = (safeDescription || '').replace(/\s+/g, ' ').trim();
+            const full = (safeFullText || '').replace(/\s+/g, ' ').trim();
+
+            const hasMore = full.length > Math.max(desc.length + 120, 200);
 
             descriptionEl.innerHTML = `
                 <div class="crisis-summary">
-                    <p style="color: #ddd; line-height: 1.6; margin-bottom: 15px;">${safeDescription}</p>
-                    ${crisis.fullText && crisis.fullText !== crisis.description ? `
-                        <details style="margin-top: 10px;">
-                            <summary style="cursor: pointer; color: var(--primary-gold); font-weight: 600; margin-bottom: 10px;">
+                    <p style="color:#ddd; line-height:1.6; margin-bottom:15px;">${desc}</p>
+                    ${hasMore ? `
+                        <details style="margin-top:10px;">
+                            <summary style="cursor:pointer; color:var(--primary-gold); font-weight:600; margin-bottom:10px;">
                                 📰 Read Full Story
                             </summary>
-                            <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; color: #ddd; line-height: 1.6; margin-top: 10px;">
-                                ${safeFullText.substring(0, 800)}${safeFullText.length > 800 ? '...' : ''}
+                            <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:10px; color:#ddd; line-height:1.6; margin-top:10px;">
+                                ${full.length > 800 ? full.slice(0, 800) + '…' : full}
                             </div>
                         </details>
                     ` : ''}
@@ -4053,7 +4058,7 @@ class PresidentGame {
 
     generateContextualCrisis() {
         // DISABLED: Crisis panel only shows when clicking a news headline
-        this.showNotification('⚠️ Crisis panel disabled - click news to respond', 'info');
+        console.log('⚠️ Crisis panel disabled - click news to respond');
     }
 
     gameLoop() {
